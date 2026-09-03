@@ -6,7 +6,7 @@ const runtimePath = path.join(__dirname, '.index-runtime.js');
 let code = fs.readFileSync(sourcePath, 'utf8');
 
 code = code.replace(
-  '[`Alle gangleden worden automatisch uit Discord gesynchroniseerd naar de tab Leden.\\",',
+  '[`Alle gangleden worden automatisch uit Discord gesynchroniseerd naar de tab Leden.",',
   '["Alle gangleden worden automatisch uit Discord gesynchroniseerd naar de tab Leden.",'
 );
 
