@@ -1,3 +1,5 @@
+const {stylePayments}=require('./sheet-payments-v2');
+
 const C={
   black:{red:.025,green:.028,blue:.035},
   panel:{red:.07,green:.075,blue:.09},
@@ -44,6 +46,7 @@ async function styleMembers(sheets,spreadsheetId,title='Leden'){
     {addConditionalFormatRule:{rule:{ranges:[range(sid,1,1000,4,5)],booleanRule:{condition:{type:'TEXT_EQ',values:[{userEnteredValue:'OPENSTAAND'}]},format:{backgroundColorStyle:rgb(C.dangerDark),textFormat:{foregroundColorStyle:rgb(C.danger),bold:true}}}},index:0}}
   ];
   await sheets.spreadsheets.batchUpdate({spreadsheetId,requestBody:{requests}});
+  await stylePayments(sheets,spreadsheetId,'Weekbetalingen');
 }
 
 module.exports={styleMembers};
