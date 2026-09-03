@@ -61,12 +61,13 @@ async function ensureSheets() {
 
   const headers = [
     [TABS.dashboard, "A1:B6", [["Sondravo Family Dashboard", ""],["Laatste update", ""],["Huidig saldo", ""],["Totaal inkomsten", ""],["Totaal uitgaven", ""],["Weekpot tarief", CFG.weeklyAmount]]],
-    [TABS.payments, "A1:J1", [["Request ID","Week","Discord ID","Discord naam","Bedrag","Status","Aangevraagd op","Behandeld op","Behandeld door","Opmerking"]]],
+    [TABS.payments, "A1:J1", [["Payment ID","Week","Discord ID","Discord naam","Bedrag","Status","Aangemaakt op","Verwerkt op","Aangemaakt door","Opmerking"]]],
     [TABS.expenses, "A1:H1", [["Expense ID","Datum","Bedrag","Categorie","Omschrijving","Toegevoegd door ID","Toegevoegd door","Saldo na uitgave"]]],
     [TABS.transactions, "A1:I1", [["Transaction ID","Datum","Type","Bedrag","Discord ID","Discord naam","Omschrijving","Referentie","Saldo na transactie"]]],
     [TABS.logs, "A1:F1", [["Datum","Actie","Actor ID","Actor naam","Details","Referentie"]]],
     [TABS.settings, "A1:B3", [["Key","Value"],["dashboard_channel_id",""],["dashboard_message_id",""]]]
   ];
+
   for (const [tab, range, values] of headers) {
     await sheets.spreadsheets.values.update({ spreadsheetId: CFG.spreadsheetId, range: `${tab}!${range}`, valueInputOption: "USER_ENTERED", requestBody: { values } });
   }
@@ -120,13 +121,13 @@ async function approvedForWeek(userId, week) {
   return rows.some(r => r[1] === week && r[2] === userId && String(r[5] || "").toUpperCase() === "APPROVED");
 }
 async function registerWeekPayment(member, week, actor) {
-  if (await approvedForWeek(member.id, week)) return false;
+  if (await approvedForWeek(member.id, week)) throw new Error("Deze persoon staat deze week al op betaald.");
   const paymentId = id("pay");
   const now = new Date().toISOString();
-  await append(TABS.payments, [paymentId, week, member.id, member.user.username, CFG.weeklyAmount, "APPROVED", now, now, actor.username, "Door leiding geregistreerd"]);
-  await addTransaction({ id: id("tx"), type: "WEEKBETALING", amount: CFG.weeklyAmount, userId: member.id, userName: member.user.username, description: `Weekpot ${week}`, reference: paymentId });
-  await addLog("WEEKBETALING", actor, `${member.user.username} • ${week} • ${money(CFG.weeklyAmount)}`, paymentId);
-  return true;
+  await append(TABS.payments, [paymentId, week, member.id, member.user.username, CFG.weeklyAmount, "APPROVED", now, now, actor.username, "Door leiding aangemaakt"]);
+  const balance = await addTransaction({ id: id("tx"), type: "WEEKBETALING", amount: CFG.weeklyAmount, userId: member.id, userName: member.user.username, description: `Weekpot ${week}`, reference: paymentId });
+  await addLog("WEEKBETALING_AANGEMAAKT", actor, `${member.user.username} • ${week} • ${money(CFG.weeklyAmount)}`, paymentId);
+  return { paymentId, balance };
 }
 
 function money(v) { return `${CFG.currency}${Math.round(Number(v || 0)).toLocaleString("nl-NL")}`; }
@@ -176,13 +177,13 @@ async function dashboardData(guild) {
 }
 function dashboardEmbed(data) {
   const open = Math.max(0, data.totalMembers - data.paid);
-  return baseEmbed().setTitle(`🩸 ${CFG.gangName.toUpperCase()}`).setDescription("**Management Panel**\nAlleen de leiding registreert betalingen en uitgaven.").addFields(
+  return baseEmbed().setTitle(`🩸 ${CFG.gangName.toUpperCase()}`).setDescription("**Management Panel**\nAlleen de leiding registreert weekbetalingen en uitgaven.").addFields(
     { name: "💰 Gangpot", value: `**${money(data.balance)}**`, inline: true },
     { name: "💵 Weekpot", value: `${money(CFG.weeklyAmount)} p.p.`, inline: true },
     { name: `📅 ${weekKey()}`, value: `✅ ${data.paid}/${data.totalMembers} betaald\n⏳ ${open} openstaand`, inline: true },
     { name: "📈 Inkomsten", value: money(data.income), inline: true },
     { name: "📉 Uitgaven", value: money(data.expense), inline: true },
-    { name: "🔒 Beheer", value: "Leiding kiest wie betaald heeft.", inline: true }
+    { name: "🔒 Beheer", value: "Leiding maakt betalingen aan en kiest het lid.", inline: true }
   );
 }
 async function refreshDashboard(guild) {
@@ -257,22 +258,44 @@ client.on(Events.InteractionCreate, async i => {
         await i.reply({ ephemeral: true, embeds: [baseEmbed().setTitle("💰 Gangpot").setDescription(`Beschikbaar: **${money(t.balance)}**`).addFields({ name: "📈 Totaal binnen", value: money(t.income), inline: true },{ name: "📉 Totaal eruit", value: money(t.expense), inline: true })] });
         return;
       }
+
       if (i.customId === "sf:week") {
         requireFounder(i);
         const week = weekKey();
         const members = await familyMembers(i.guild);
         const rows = await getRows(TABS.payments, "A2:J");
         const paidIds = new Set(rows.filter(r => r[1] === week && String(r[5] || "").toUpperCase() === "APPROVED").map(r => r[2]));
-        const unpaid = [...members.values()].filter(m => !paidIds.has(m.id)).sort((a,b) => a.displayName.localeCompare(b.displayName));
-        if (!unpaid.length) {
-          await i.reply({ content: `✅ Iedereen staat voor **${week}** op betaald.`, ephemeral: true });
-          return;
-        }
-        const options = unpaid.slice(0, 25).map(m => ({ label: m.displayName.slice(0, 100), description: `Markeer ${money(CFG.weeklyAmount)} als betaald`, value: m.id }));
-        const select = new StringSelectMenuBuilder().setCustomId(`sf:week:members:${week}`).setPlaceholder("Kies wie betaald heeft...").setMinValues(1).setMaxValues(options.length).addOptions(options);
-        await i.reply({ ephemeral: true, embeds: [baseEmbed().setTitle(`💵 Weekpot beheren • ${week}`).setDescription(`Selecteer één of meerdere leden die **${money(CFG.weeklyAmount)}** hebben betaald.\n\nNa bevestigen worden ze direct in Google Sheets gezet en wordt de gangpot bijgewerkt.`)], components: [new ActionRowBuilder().addComponents(select)] });
+        const paid = [...members.values()].filter(m => paidIds.has(m.id)).length;
+        const open = Math.max(0, members.size - paid);
+        const button = new ButtonBuilder().setCustomId(`sf:week:new:${week}`).setLabel("Nieuwe betaling aanmaken").setEmoji("➕").setStyle(ButtonStyle.Success).setDisabled(open === 0);
+        await i.reply({
+          ephemeral: true,
+          embeds: [baseEmbed().setTitle(`💵 Weekpot beheren • ${week}`).setDescription(`Bedrag per persoon: **${money(CFG.weeklyAmount)}**\n✅ Betaald: **${paid}/${members.size}**\n⏳ Openstaand: **${open}**\n\nKlik op **Nieuwe betaling aanmaken** en kies daarna de persoon die betaald heeft.`)],
+          components: [new ActionRowBuilder().addComponents(button)]
+        });
         return;
       }
+
+      if (i.customId.startsWith("sf:week:new:")) {
+        requireFounder(i);
+        const week = i.customId.split(":")[3];
+        const members = await familyMembers(i.guild);
+        const rows = await getRows(TABS.payments, "A2:J");
+        const paidIds = new Set(rows.filter(r => r[1] === week && String(r[5] || "").toUpperCase() === "APPROVED").map(r => r[2]));
+        const unpaid = [...members.values()].filter(m => !paidIds.has(m.id)).sort((a,b) => a.displayName.localeCompare(b.displayName));
+        if (!unpaid.length) {
+          await i.update({ content: `✅ Iedereen staat voor **${week}** op betaald.`, embeds: [], components: [] });
+          return;
+        }
+        const options = unpaid.slice(0, 25).map(m => ({ label: m.displayName.slice(0, 100), description: `${money(CFG.weeklyAmount)} weekbetaling`, value: m.id }));
+        const select = new StringSelectMenuBuilder().setCustomId(`sf:week:pick:${week}`).setPlaceholder("Kies één persoon die heeft betaald...").setMinValues(1).setMaxValues(1).addOptions(options);
+        await i.update({
+          embeds: [baseEmbed().setTitle("➕ Nieuwe weekbetaling").setDescription(`Week: **${week}**\nBedrag: **${money(CFG.weeklyAmount)}**\n\nKies nu de persoon die betaald heeft.`)],
+          components: [new ActionRowBuilder().addComponents(select)]
+        });
+        return;
+      }
+
       if (i.customId === "sf:expense") {
         requireFounder(i);
         const modal = new ModalBuilder().setCustomId("sf:modal:expense").setTitle("Nieuwe Sondravo uitgave");
@@ -283,6 +306,7 @@ client.on(Events.InteractionCreate, async i => {
         await i.showModal(modal);
         return;
       }
+
       if (i.customId === "sf:members") {
         requireFounder(i);
         const members = await familyMembers(i.guild);
@@ -293,6 +317,7 @@ client.on(Events.InteractionCreate, async i => {
         await i.reply({ ephemeral: true, embeds: [baseEmbed().setTitle(`👥 Leden • ${week}`).setDescription(lines.join("\n") || "Geen family-leden gevonden.")] });
         return;
       }
+
       if (i.customId === "sf:overview") {
         requireFounder(i);
         const rows = (await getRows(TABS.transactions, "A2:I")).slice(-10).reverse();
@@ -300,6 +325,7 @@ client.on(Events.InteractionCreate, async i => {
         await i.reply({ ephemeral: true, embeds: [baseEmbed().setTitle("📊 Laatste transacties").setDescription(lines.join("\n\n") || "Nog geen transacties.")] });
         return;
       }
+
       if (i.customId === "sf:logs") {
         requireFounder(i);
         const rows = (await getRows(TABS.logs, "A2:F")).slice(-10).reverse();
@@ -309,24 +335,19 @@ client.on(Events.InteractionCreate, async i => {
       }
     }
 
-    if (i.isStringSelectMenu() && i.customId.startsWith("sf:week:members:")) {
+    if (i.isStringSelectMenu() && i.customId.startsWith("sf:week:pick:")) {
       requireFounder(i);
-      await i.deferReply({ ephemeral: true });
+      await i.deferUpdate();
       const week = i.customId.split(":")[3];
-      const done = [];
-      const skipped = [];
-      for (const memberId of i.values) {
-        const member = await i.guild.members.fetch(memberId).catch(() => null);
-        if (!member) continue;
-        if (await registerWeekPayment(member, week, i.user)) done.push(member);
-        else skipped.push(member);
-      }
+      const memberId = i.values[0];
+      const member = await i.guild.members.fetch(memberId).catch(() => null);
+      if (!member) throw new Error("Lid niet gevonden.");
+      const result = await registerWeekPayment(member, week, i.user);
       await refreshDashboard(i.guild);
-      const t = await totals();
-      let text = done.length ? `✅ **${done.length} betaling(en) verwerkt:**\n${done.map(m => `• <@${m.id}> — ${money(CFG.weeklyAmount)}`).join("\n")}` : "Geen nieuwe betalingen verwerkt.";
-      if (skipped.length) text += `\n\nℹ️ Al betaald: ${skipped.map(m => `<@${m.id}>`).join(", ")}`;
-      text += `\n\n💰 Nieuwe gangpot: **${money(t.balance)}**`;
-      await i.editReply(text);
+      await i.editReply({
+        embeds: [baseEmbed().setTitle("✅ Betaling aangemaakt").setDescription(`👤 Persoon: <@${member.id}>\n📅 Week: **${week}**\n💵 Bedrag: **${money(CFG.weeklyAmount)}**\n💰 Nieuwe gangpot: **${money(result.balance)}**\n\nDe betaling staat ook in Google Sheets.`)],
+        components: []
+      });
       return;
     }
 
