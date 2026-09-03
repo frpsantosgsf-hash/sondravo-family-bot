@@ -1,170 +1,110 @@
 const COLORS = {
-  red: { red: 0.55, green: 0.0, blue: 0.0 },
-  redDark: { red: 0.22, green: 0.0, blue: 0.0 },
-  black: { red: 0.06, green: 0.06, blue: 0.07 },
-  charcoal: { red: 0.12, green: 0.12, blue: 0.14 },
-  gray: { red: 0.22, green: 0.22, blue: 0.25 },
-  light: { red: 0.94, green: 0.92, blue: 0.84 },
-  white: { red: 1, green: 1, blue: 1 },
-  green: { red: 0.08, green: 0.48, blue: 0.22 },
-  amber: { red: 0.85, green: 0.55, blue: 0.08 }
+  red: { red: 0.72, green: 0.04, blue: 0.08 },
+  redDark: { red: 0.20, green: 0.015, blue: 0.025 },
+  black: { red: 0.035, green: 0.04, blue: 0.05 },
+  charcoal: { red: 0.075, green: 0.08, blue: 0.10 },
+  panel: { red: 0.105, green: 0.11, blue: 0.135 },
+  gray: { red: 0.28, green: 0.29, blue: 0.33 },
+  muted: { red: 0.67, green: 0.68, blue: 0.73 },
+  white: { red: 0.97, green: 0.97, blue: 0.985 },
+  green: { red: 0.08, green: 0.55, blue: 0.30 },
+  greenDark: { red: 0.035, green: 0.22, blue: 0.12 },
+  amber: { red: 0.96, green: 0.62, blue: 0.10 },
+  amberDark: { red: 0.30, green: 0.18, blue: 0.03 },
+  blue: { red: 0.12, green: 0.48, blue: 0.90 },
+  purple: { red: 0.53, green: 0.20, blue: 0.93 }
 };
 
-function rgb(c) { return { rgbColor: c }; }
-function range(sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex) {
-  return { sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex };
-}
+const rgb = c => ({ rgbColor: c });
+const gridRange = (sheetId, r1, r2, c1, c2) => ({ sheetId, startRowIndex: r1, endRowIndex: r2, startColumnIndex: c1, endColumnIndex: c2 });
 
-function headerRequest(sheetId, columns) {
-  return {
-    repeatCell: {
-      range: range(sheetId, 0, 1, 0, columns),
-      cell: {
-        userEnteredFormat: {
-          backgroundColorStyle: rgb(COLORS.redDark),
-          textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true, fontSize: 11 },
-          horizontalAlignment: "CENTER",
-          verticalAlignment: "MIDDLE",
-          wrapStrategy: "WRAP",
-          borders: {
-            bottom: { style: "SOLID_THICK", colorStyle: rgb(COLORS.red) }
-          }
-        }
-      },
-      fields: "userEnteredFormat"
-    }
-  };
+function width(sheetId, col, pixels) {
+  return { updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: col, endIndex: col + 1 }, properties: { pixelSize: pixels }, fields: "pixelSize" } };
 }
-
-function bodyRequest(sheetId, columns) {
-  return {
-    repeatCell: {
-      range: { sheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: columns },
-      cell: {
-        userEnteredFormat: {
-          backgroundColorStyle: rgb(COLORS.black),
-          textFormat: { foregroundColorStyle: rgb(COLORS.light), fontSize: 10 },
-          verticalAlignment: "MIDDLE",
-          wrapStrategy: "WRAP"
-        }
-      },
-      fields: "userEnteredFormat(backgroundColorStyle,textFormat,verticalAlignment,wrapStrategy)"
-    }
-  };
+function rowHeight(sheetId, row, pixels) {
+  return { updateDimensionProperties: { range: { sheetId, dimension: "ROWS", startIndex: row, endIndex: row + 1 }, properties: { pixelSize: pixels }, fields: "pixelSize" } };
 }
-
-function widthRequest(sheetId, start, end, pixels) {
-  return {
-    updateDimensionProperties: {
-      range: { sheetId, dimension: "COLUMNS", startIndex: start, endIndex: end },
-      properties: { pixelSize: pixels },
-      fields: "pixelSize"
-    }
-  };
+function body(sheetId, cols) {
+  return { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols }, cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.black), textFormat: { foregroundColorStyle: rgb(COLORS.white), fontSize: 10 }, verticalAlignment: "MIDDLE", wrapStrategy: "WRAP", padding: { top: 6, bottom: 6, left: 8, right: 8 }, borders: { bottom: { style: "SOLID", colorStyle: rgb(COLORS.charcoal) } } } }, fields: "userEnteredFormat" } };
 }
-
-function numberFormatRequest(sheetId, startColumnIndex, endColumnIndex, pattern = "$#,##0") {
-  return {
-    repeatCell: {
-      range: { sheetId, startRowIndex: 1, startColumnIndex, endColumnIndex },
-      cell: { userEnteredFormat: { numberFormat: { type: "CURRENCY", pattern } } },
-      fields: "userEnteredFormat.numberFormat"
-    }
-  };
+function header(sheetId, cols) {
+  return { repeatCell: { range: gridRange(sheetId, 0, 1, 0, cols), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.redDark), textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true, fontSize: 11 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", wrapStrategy: "WRAP", padding: { top: 8, bottom: 8, left: 6, right: 6 }, borders: { bottom: { style: "SOLID_THICK", colorStyle: rgb(COLORS.red) } } } }, fields: "userEnteredFormat" } };
 }
-
-function dateFormatRequest(sheetId, startColumnIndex, endColumnIndex) {
-  return {
-    repeatCell: {
-      range: { sheetId, startRowIndex: 1, startColumnIndex, endColumnIndex },
-      cell: { userEnteredFormat: { numberFormat: { type: "DATE_TIME", pattern: "dd-mm-yyyy HH:mm" } } },
-      fields: "userEnteredFormat.numberFormat"
-    }
-  };
+function currency(sheetId, c1, c2) {
+  return { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: c1, endColumnIndex: c2 }, cell: { userEnteredFormat: { numberFormat: { type: "CURRENCY", pattern: "$#,##0;-$#,##0" } } }, fields: "userEnteredFormat.numberFormat" } };
+}
+function datetime(sheetId, c1, c2) {
+  return { repeatCell: { range: { sheetId, startRowIndex: 1, startColumnIndex: c1, endColumnIndex: c2 }, cell: { userEnteredFormat: { numberFormat: { type: "DATE_TIME", pattern: "dd-mm-yyyy HH:mm" } } }, fields: "userEnteredFormat.numberFormat" } };
+}
+function conditionalText(sheetId, col, text, bg, fg = COLORS.white) {
+  return { addConditionalFormatRule: { index: 0, rule: { ranges: [{ sheetId, startRowIndex: 1, startColumnIndex: col, endColumnIndex: col + 1 }], booleanRule: { condition: { type: "TEXT_EQ", values: [{ userEnteredValue: text }] }, format: { backgroundColorStyle: rgb(bg), textFormat: { foregroundColorStyle: rgb(fg), bold: true }, horizontalAlignment: "CENTER" } } } };
 }
 
 async function formatSpreadsheet(sheets, spreadsheetId, TABS) {
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId,
-    fields: "sheets.properties(sheetId,title,gridProperties)"
-  });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties(sheetId,title,gridProperties)" });
   const byTitle = new Map((meta.data.sheets || []).map(s => [s.properties.title, s.properties]));
   const requests = [];
 
   const schemas = {
-    [TABS.payments]: { cols: 10, widths: [130, 95, 155, 170, 105, 110, 150, 150, 150, 220] },
-    [TABS.expenses]: { cols: 10, widths: [130, 145, 105, 140, 260, 155, 150, 120, 105, 220] },
-    [TABS.transactions]: { cols: 9, widths: [135, 145, 150, 105, 155, 165, 280, 140, 120] },
-    [TABS.logs]: { cols: 6, widths: [150, 190, 155, 160, 360, 150] },
-    [TABS.settings]: { cols: 2, widths: [220, 320] }
+    [TABS.payments]: { cols: 10, widths: [135, 100, 170, 170, 110, 120, 165, 165, 165, 250] },
+    [TABS.expenses]: { cols: 10, widths: [135, 165, 110, 145, 280, 170, 165, 130, 120, 240] },
+    [TABS.transactions]: { cols: 9, widths: [145, 165, 175, 115, 170, 175, 300, 155, 135] },
+    [TABS.logs]: { cols: 6, widths: [170, 210, 175, 175, 390, 170] },
+    [TABS.members]: { cols: 7, widths: [185, 210, 165, 250, 120, 135, 180] },
+    [TABS.settings]: { cols: 2, widths: [250, 420] }
   };
 
   for (const [title, cfg] of Object.entries(schemas)) {
     const p = byTitle.get(title);
     if (!p) continue;
     requests.push(
-      { updateSheetProperties: { properties: { sheetId: p.sheetId, gridProperties: { frozenRowCount: 1, hideGridlines: true }, tabColorStyle: rgb(title === TABS.settings ? COLORS.gray : COLORS.red) }, fields: "gridProperties.frozenRowCount,gridProperties.hideGridlines,tabColorStyle" } },
-      headerRequest(p.sheetId, cfg.cols),
-      bodyRequest(p.sheetId, cfg.cols),
-      { updateDimensionProperties: { range: { sheetId: p.sheetId, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 34 }, fields: "pixelSize" } }
+      { updateSheetProperties: { properties: { sheetId: p.sheetId, gridProperties: { frozenRowCount: 1, hideGridlines: true }, tabColorStyle: rgb(title === TABS.settings ? COLORS.gray : title === TABS.members ? COLORS.purple : COLORS.red) }, fields: "gridProperties.frozenRowCount,gridProperties.hideGridlines,tabColorStyle" } },
+      header(p.sheetId, cfg.cols), body(p.sheetId, cfg.cols), rowHeight(p.sheetId, 0, 38)
     );
-    cfg.widths.forEach((w, i) => requests.push(widthRequest(p.sheetId, i, i + 1, w)));
+    cfg.widths.forEach((w, i) => requests.push(width(p.sheetId, i, w)));
   }
 
   const payments = byTitle.get(TABS.payments);
-  if (payments) {
-    requests.push(numberFormatRequest(payments.sheetId, 4, 5), dateFormatRequest(payments.sheetId, 6, 8));
-  }
+  if (payments) requests.push(currency(payments.sheetId, 4, 5), datetime(payments.sheetId, 6, 8), conditionalText(payments.sheetId, 5, "APPROVED", COLORS.greenDark, COLORS.green), conditionalText(payments.sheetId, 5, "REVERSED", COLORS.redDark, { red: 1, green: 0.35, blue: 0.35 }));
+
   const expenses = byTitle.get(TABS.expenses);
-  if (expenses) {
-    requests.push(numberFormatRequest(expenses.sheetId, 2, 3), numberFormatRequest(expenses.sheetId, 7, 8), dateFormatRequest(expenses.sheetId, 1, 2));
-  }
+  if (expenses) requests.push(currency(expenses.sheetId, 2, 3), currency(expenses.sheetId, 7, 8), datetime(expenses.sheetId, 1, 2), conditionalText(expenses.sheetId, 8, "ACTIVE", COLORS.greenDark, COLORS.green), conditionalText(expenses.sheetId, 8, "REVERSED", COLORS.redDark, { red: 1, green: 0.35, blue: 0.35 }));
+
   const transactions = byTitle.get(TABS.transactions);
-  if (transactions) {
-    requests.push(numberFormatRequest(transactions.sheetId, 3, 4), numberFormatRequest(transactions.sheetId, 8, 9), dateFormatRequest(transactions.sheetId, 1, 2));
-  }
+  if (transactions) requests.push(currency(transactions.sheetId, 3, 4), currency(transactions.sheetId, 8, 9), datetime(transactions.sheetId, 1, 2));
+
   const logs = byTitle.get(TABS.logs);
-  if (logs) requests.push(dateFormatRequest(logs.sheetId, 0, 1));
+  if (logs) requests.push(datetime(logs.sheetId, 0, 1));
+
+  const members = byTitle.get(TABS.members);
+  if (members) requests.push(conditionalText(members.sheetId, 4, "BETAALD", COLORS.greenDark, COLORS.green), conditionalText(members.sheetId, 4, "OPENSTAAND", COLORS.amberDark, COLORS.amber));
 
   const dashboard = byTitle.get(TABS.dashboard);
   if (dashboard) {
     const sid = dashboard.sheetId;
     requests.push(
-      { updateSheetProperties: { properties: { sheetId: sid, gridProperties: { hideGridlines: true, frozenRowCount: 1 }, tabColorStyle: rgb(COLORS.red) }, fields: "gridProperties.hideGridlines,gridProperties.frozenRowCount,tabColorStyle" } },
-      { unmergeCells: { range: range(sid, 0, 1, 0, 2) } },
-      { mergeCells: { range: range(sid, 0, 1, 0, 2), mergeType: "MERGE_ALL" } },
-      {
-        repeatCell: {
-          range: range(sid, 0, 1, 0, 2),
-          cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.redDark), textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true, fontSize: 16 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" } },
-          fields: "userEnteredFormat"
-        }
-      },
-      {
-        repeatCell: {
-          range: range(sid, 1, 6, 0, 1),
-          cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.charcoal), textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true }, verticalAlignment: "MIDDLE" } },
-          fields: "userEnteredFormat"
-        }
-      },
-      {
-        repeatCell: {
-          range: range(sid, 1, 6, 1, 2),
-          cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.black), textFormat: { foregroundColorStyle: rgb(COLORS.light), bold: true }, horizontalAlignment: "RIGHT", verticalAlignment: "MIDDLE" } },
-          fields: "userEnteredFormat"
-        }
-      },
-      numberFormatRequest(sid, 1, 2),
-      widthRequest(sid, 0, 1, 230),
-      widthRequest(sid, 1, 2, 190),
-      { updateDimensionProperties: { range: { sheetId: sid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 42 }, fields: "pixelSize" } },
-      { updateDimensionProperties: { range: { sheetId: sid, dimension: "ROWS", startIndex: 1, endIndex: 6 }, properties: { pixelSize: 30 }, fields: "pixelSize" } }
+      { updateSheetProperties: { properties: { sheetId: sid, gridProperties: { hideGridlines: true, frozenRowCount: 2 }, tabColorStyle: rgb(COLORS.red) }, fields: "gridProperties.hideGridlines,gridProperties.frozenRowCount,tabColorStyle" } },
+      { repeatCell: { range: { sheetId: sid }, cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.black), textFormat: { foregroundColorStyle: rgb(COLORS.white) } } }, fields: "userEnteredFormat.backgroundColorStyle,userEnteredFormat.textFormat" } },
+      { unmergeCells: { range: gridRange(sid, 0, 14, 0, 8) } },
+      { mergeCells: { range: gridRange(sid, 0, 2, 0, 8), mergeType: "MERGE_ALL" } },
+      { repeatCell: { range: gridRange(sid, 0, 2, 0, 8), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.redDark), textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true, fontSize: 20 }, verticalAlignment: "MIDDLE", horizontalAlignment: "LEFT", padding: { left: 18 } } }, fields: "userEnteredFormat" } },
+      { mergeCells: { range: gridRange(sid, 2, 3, 0, 8), mergeType: "MERGE_ALL" } },
+      { repeatCell: { range: gridRange(sid, 2, 3, 0, 8), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.charcoal), textFormat: { foregroundColorStyle: rgb(COLORS.muted), italic: true, fontSize: 10 }, padding: { left: 18 } } }, fields: "userEnteredFormat" } },
+      ...[[0,2],[2,4],[4,6],[6,8]].flatMap(([c1,c2], idx) => [
+        { mergeCells: { range: gridRange(sid, 4, 5, c1, c2), mergeType: "MERGE_ALL" } },
+        { mergeCells: { range: gridRange(sid, 5, 7, c1, c2), mergeType: "MERGE_ALL" } },
+        { repeatCell: { range: gridRange(sid, 4, 5, c1, c2), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.panel), textFormat: { foregroundColorStyle: rgb(COLORS.muted), bold: true, fontSize: 10 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", borders: { top: { style: "SOLID", colorStyle: rgb(idx === 0 ? COLORS.purple : idx === 1 ? COLORS.green : idx === 2 ? COLORS.red : COLORS.blue) }, left: { style: "SOLID", colorStyle: rgb(COLORS.gray) }, right: { style: "SOLID", colorStyle: rgb(COLORS.gray) } } } }, fields: "userEnteredFormat" } },
+        { repeatCell: { range: gridRange(sid, 5, 7, c1, c2), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.panel), textFormat: { foregroundColorStyle: rgb(idx === 0 ? COLORS.purple : idx === 1 ? COLORS.green : idx === 2 ? { red: 1, green: 0.35, blue: 0.35 } : COLORS.blue), bold: true, fontSize: 18 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", borders: { bottom: { style: "SOLID", colorStyle: rgb(COLORS.gray) }, left: { style: "SOLID", colorStyle: rgb(COLORS.gray) }, right: { style: "SOLID", colorStyle: rgb(COLORS.gray) } } } }, fields: "userEnteredFormat" } }
+      ]),
+      { mergeCells: { range: gridRange(sid, 9, 10, 0, 8), mergeType: "MERGE_ALL" } },
+      { repeatCell: { range: gridRange(sid, 9, 10, 0, 8), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.redDark), textFormat: { foregroundColorStyle: rgb(COLORS.white), bold: true, fontSize: 12 }, padding: { left: 12 } } }, fields: "userEnteredFormat" } },
+      { repeatCell: { range: gridRange(sid, 10, 13, 0, 8), cell: { userEnteredFormat: { backgroundColorStyle: rgb(COLORS.charcoal), textFormat: { foregroundColorStyle: rgb(COLORS.white), fontSize: 11 }, verticalAlignment: "MIDDLE", padding: { left: 10, right: 10 }, borders: { bottom: { style: "SOLID", colorStyle: rgb(COLORS.gray) } } } }, fields: "userEnteredFormat" } },
+      rowHeight(sid, 0, 34), rowHeight(sid, 1, 34), rowHeight(sid, 2, 28), rowHeight(sid, 4, 30), rowHeight(sid, 5, 34), rowHeight(sid, 6, 34), rowHeight(sid, 9, 32)
     );
+    [155,155,155,155,155,155,155,155].forEach((w,i)=>requests.push(width(sid,i,w)));
   }
 
-  if (requests.length) {
-    await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
-  }
+  if (requests.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
 }
 
 module.exports = { formatSpreadsheet };
