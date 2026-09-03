@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  APPROVED
+  REVERSED
+}
+
+enum ExpenseStatus {
+  ACTIVE
+  REVERSED
+}
+
+enum TransactionType {
+  WEEKBETALING
+  WEEKBETALING_TERUG
+  UITGAVE
+  UITGAVE_TERUG
+  CORRECTIE_PLUS
+  CORRECTIE_MIN
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  discordId   String   @unique
+  displayName String
+  username    String
+  isPayer     Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  payments    Payment[]
+}
+
+model Week {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  amount    Int       @default(50000)
+  isActive  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  payments  Payment[]
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  memberId    String
+  weekId      String
+  amount      Int           @default(50000)
+  status      PaymentStatus @default(APPROVED)
+  createdById String
+  createdBy   String
+  note        String?
+  createdAt   DateTime      @default(now())
+  reversedAt  DateTime?
+  member      Member        @relation(fields: [memberId], references: [id])
+  week        Week          @relation(fields: [weekId], references: [id])
+
+  @@unique([memberId, weekId, status])
+  @@index([weekId])
+}
+
+model Expense {
+  id          String        @id @default(cuid())
+  amount      Int
+  category    String
+  description String
+  status      ExpenseStatus @default(ACTIVE)
+  createdById String
+  createdBy   String
+  createdAt   DateTime      @default(now())
+  reversedAt  DateTime?
+  note        String?
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amount      Int
+  discordId   String?
+  discordName String?
+  description String
+  reference   String?
+  balanceAfter Int
+  createdAt   DateTime        @default(now())
+
+  @@index([createdAt])
+  @@index([type])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  actorId   String
+  actorName String
+  details   String
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
