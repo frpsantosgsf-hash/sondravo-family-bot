@@ -4,7 +4,7 @@
   "description": "Sondravo Family Discord Management Bot",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
     "deploy": "node index.js --deploy"
   },
   "engines": {
