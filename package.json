@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "deploy": "node index.js --deploy"
+    "deploy": "node index.js --deploy",
+    "format-sheet": "node format-sheet.js"
   },
   "engines": {
     "node": ">=20"
