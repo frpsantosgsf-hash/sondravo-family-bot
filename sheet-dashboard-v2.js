@@ -1,3 +1,5 @@
+const {styleMembers}=require('./sheet-members-v2');
+
 const C={black:{red:.025,green:.028,blue:.035},panel:{red:.07,green:.075,blue:.09},red:{red:.55,green:.02,blue:.04},red2:{red:.22,green:.015,blue:.025},white:{red:.96,green:.96,blue:.98},muted:{red:.62,green:.64,blue:.69},green:{red:.15,green:.72,blue:.38},amber:{red:.95,green:.62,blue:.12},blue:{red:.25,green:.55,blue:.95}};
 const rgb=x=>({rgbColor:x});
 const range=(sid,r1,r2,c1,c2)=>({sheetId:sid,startRowIndex:r1,endRowIndex:r2,startColumnIndex:c1,endColumnIndex:c2});
@@ -29,5 +31,6 @@ async function styleDashboard(sheets,spreadsheetId,title='Dashboard'){
   }
   [150,150,150,150,150,150,150,150].forEach((px,i)=>req.push(width(sid,i,px)));
   await sheets.spreadsheets.batchUpdate({spreadsheetId,requestBody:{requests:req}});
+  await styleMembers(sheets,spreadsheetId,'Leden');
 }
 module.exports={styleDashboard};
