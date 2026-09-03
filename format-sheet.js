@@ -6,6 +6,7 @@ const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
 const TABS = {
   dashboard: "Dashboard",
+  members: "Leden",
   payments: "Weekbetalingen",
   expenses: "Uitgaven",
   transactions: "Transacties",
