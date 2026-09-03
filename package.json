@@ -1,11 +1,11 @@
 {
   "name": "sondravo-family-bot",
-  "version": "2.0.0",
-  "description": "Sondravo Family Discord Management Bot v2",
-  "main": "app-v2.js",
+  "version": "3.0.0",
+  "description": "Sondravo Family Discord Management Bot v3",
+  "main": "app-v3.js",
   "scripts": {
-    "start": "node app-v2.js",
-    "deploy": "node app-v2.js --deploy"
+    "start": "node app-v3.js",
+    "deploy": "node app-v3.js --deploy"
   },
   "engines": {
     "node": ">=20"
