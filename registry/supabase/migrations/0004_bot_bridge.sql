@@ -86,9 +86,12 @@ begin
     returning id into v_id;
     v_created := true;
 
+    -- Op de primaire sleutel botsen in plaats van op de kolomnaam: deze
+    -- functie geeft een kolom `member_id` terug, en in `on conflict
+    -- (member_id)` zou Postgres niet weten of dat de uitvoer of de kolom is.
     insert into public.private_member_data (member_id, discord_user_id, updated_at)
     values (v_id, p_discord_user_id, now())
-    on conflict (member_id) do update
+    on conflict on constraint private_member_data_pkey do update
       set discord_user_id = excluded.discord_user_id,
           updated_at      = now();
   else

@@ -31,10 +31,6 @@ export function sortRanks(ranks: Rank[]): Rank[] {
   return [...ranks].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export function findRank(ranks: Rank[], key: string): Rank | undefined {
-  return ranks.find((rank) => rank.key === key);
-}
-
 export interface RankAccent {
   /** Rangkop boven een groep. */
   heading: CSSProperties;

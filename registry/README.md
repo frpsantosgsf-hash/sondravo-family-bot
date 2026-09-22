@@ -83,7 +83,7 @@ registry/
 │   ├── discord.ts               Discord API (server-only)
 │   └── video.ts                 YouTube/bestand-herkenning voor de clip
 ├── supabase/
-│   ├── migrations/              6 SQL-bestanden, in volgorde uitvoeren
+│   ├── migrations/              7 SQL-bestanden, in volgorde uitvoeren
 │   ├── verify_rls.sql           Controlescript voor de beveiliging
 │   └── README.md
 ├── types/                       Database- en app-types
@@ -113,8 +113,16 @@ uit. Plak de inhoud, klik **Run**, en ga pas daarna naar het volgende bestand.
 | 4 | `supabase/migrations/0004_bot_bridge.sql` | Koppeling voor `/new` in Discord |
 | 5 | `supabase/migrations/0005_rank_colors.sql` | De kleur van elke Discord-rol |
 | 6 | `supabase/migrations/0006_discord_admin_roles.sql` | Beheerrechten via de Leader-rol |
+| 7 | `supabase/migrations/0007_fixes.sql` | Twee reparaties (zie hieronder) |
 
-Alle zes zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
+Alle zeven zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
+Dat is ook echt getest — de zeven bestanden zijn drie keer achter elkaar
+gedraaid en het register bleef op 20 leden staan.
+
+> **Bestand 7 is geen optie maar een must.** Het repareert twee fouten die in
+> de eerdere bestanden zaten: de seed maakte bij een tweede run dubbele leden
+> aan, en het `/new`-commando van de bot brak af. Draai je alles in één keer in
+> volgorde, dan merk je er niets van.
 
 ### 3. Discord Developer Application maken
 Ga naar [discord.com/developers/applications](https://discord.com/developers/applications)
@@ -505,7 +513,7 @@ Alles wat code is, is klaar. Dit kan ik niet voor je doen omdat er accounts en
 geheimen bij komen kijken:
 
 - [ ] Supabase-project aanmaken (stap 1)
-- [ ] De zes SQL-bestanden draaien (stap 2)
+- [ ] De zeven SQL-bestanden draaien (stap 2)
 - [ ] Discord Developer Application aanmaken + redirect URL (stap 3 en 4)
 - [ ] Discord-provider in Supabase aanzetten (stap 5)
 - [ ] Eén keer inloggen en jezelf in `admins` zetten (stap 7 t/m 9)

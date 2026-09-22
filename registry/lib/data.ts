@@ -142,31 +142,6 @@ export const getRegistryData = cache(async (): Promise<RegistryData> => {
   };
 });
 
-/** Lichte variant voor de voorpagina: alleen tellers. */
-export const getRegistrySummary = cache(async (): Promise<{
-  total: number;
-  limit: number;
-  familyName: string;
-  available: boolean;
-}> => {
-  if (!isSupabaseConfigured) {
-    return { total: 0, limit: FALLBACK_SETTINGS.memberLimit, familyName: FALLBACK_SETTINGS.familyName, available: false };
-  }
-
-  const supabase = await createClient();
-  const [countResult, settingsResult] = await Promise.all([
-    supabase.from('members').select('id', { count: 'exact', head: true }),
-    supabase.from('settings').select('family_name, member_limit').eq('id', 1).maybeSingle(),
-  ]);
-
-  return {
-    total: countResult.count ?? 0,
-    limit: settingsResult.data?.member_limit ?? FALLBACK_SETTINGS.memberLimit,
-    familyName: settingsResult.data?.family_name ?? FALLBACK_SETTINGS.familyName,
-    available: !countResult.error,
-  };
-});
-
 /** History. Geeft een lege lijst terug voor iedereen die geen admin is (RLS). */
 export async function getAuditLog(limit = 100): Promise<AuditEntry[]> {
   if (!isSupabaseConfigured) return [];

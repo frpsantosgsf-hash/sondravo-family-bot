@@ -171,11 +171,18 @@ declare
   candidate text;
   suffix    integer := 1;
 begin
-  if tg_op = 'UPDATE' and new.slug is not null and new.slug = old.slug then
+  -- Een expliciet meegegeven slug blijft staan zoals hij is. Dat is wat de
+  -- seed idempotent houdt: zou de trigger hier 'lahaye' stilletjes in
+  -- 'lahaye-2' veranderen, dan slaat het ON CONFLICT (slug) van de seed nooit
+  -- aan en groeit de ledenlijst bij elke run.
+  if new.slug is not null and btrim(new.slug) <> '' then
+    new.slug := coalesce(public.slugify(new.slug), new.slug);
     return new;
   end if;
 
-  base_slug := coalesce(public.slugify(new.slug), public.slugify(new.name), 'lid');
+  -- Geen slug meegegeven (zo voegt de app leden toe): afleiden uit de naam en
+  -- ophogen tot hij vrij is, zodat twee leden met dezelfde naam kunnen bestaan.
+  base_slug := coalesce(public.slugify(new.name), 'lid');
   candidate := base_slug;
 
   while exists (

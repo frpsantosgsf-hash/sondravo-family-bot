@@ -8,10 +8,16 @@ export function safeRedirectPath(
 ): string {
   if (typeof value !== 'string') return fallback;
 
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('/')) return fallback;
-  if (trimmed.startsWith('//') || trimmed.startsWith('/\\')) return fallback;
-  if (trimmed.includes('://')) return fallback;
+  // Browsers gooien tabs, newlines en andere stuurtekens weg vóórdat ze een
+  // URL lezen. Zouden wij dat niet ook doen, dan glipt "/<tab>/kwaadaardig.nl"
+  // langs de controle hieronder en wordt het in de browser alsnog
+  // "//kwaadaardig.nl" — precies de externe redirect die we tegenhouden.
+  const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, '').trim();
 
-  return trimmed;
+  if (!cleaned.startsWith('/')) return fallback;
+  if (cleaned.startsWith('//') || cleaned.startsWith('/\\')) return fallback;
+  if (cleaned.includes('://')) return fallback;
+  if (cleaned.includes('\\')) return fallback;
+
+  return cleaned;
 }
