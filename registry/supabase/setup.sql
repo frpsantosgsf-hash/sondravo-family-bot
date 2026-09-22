@@ -13,13 +13,13 @@
 --      Register bevat nu 20 leden (limiet 20).
 --  Verschijnt die, dan is alles goed gegaan.
 --
---  Dit bestand is samengesteld uit de zeven migraties in migrations/.
+--  Dit bestand is samengesteld uit de migraties in migrations/.
 --  Pas je daar iets aan, genereer dit bestand dan opnieuw.
 -- ============================================================================
 
 
 -- ****************************************************************************
--- *  DEEL 1 VAN 7  —  0001_schema.sql
+-- *  DEEL 1 VAN 8  —  0001_schema.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -416,7 +416,7 @@ create trigger settings_audit_trg
   for each row execute function public.log_settings_change();
 
 -- ****************************************************************************
--- *  DEEL 2 VAN 7  —  0002_rls_policies.sql
+-- *  DEEL 2 VAN 8  —  0002_rls_policies.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -688,7 +688,7 @@ revoke all on function public.admin_update_settings(integer, text) from public;
 grant execute on function public.admin_update_settings(integer, text) to authenticated;
 
 -- ****************************************************************************
--- *  DEEL 3 VAN 7  —  0003_seed.sql
+-- *  DEEL 3 VAN 8  —  0003_seed.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -779,7 +779,7 @@ end;
 $$;
 
 -- ****************************************************************************
--- *  DEEL 4 VAN 7  —  0004_bot_bridge.sql
+-- *  DEEL 4 VAN 8  —  0004_bot_bridge.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -937,7 +937,7 @@ revoke all on function public.bot_remove_member(text, text) from anon, authentic
 grant execute on function public.bot_remove_member(text, text) to service_role;
 
 -- ****************************************************************************
--- *  DEEL 5 VAN 7  —  0005_rank_colors.sql
+-- *  DEEL 5 VAN 8  —  0005_rank_colors.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -981,7 +981,7 @@ update public.ranks as r
    and r.color is distinct from v.color;
 
 -- ****************************************************************************
--- *  DEEL 6 VAN 7  —  0006_discord_admin_roles.sql
+-- *  DEEL 6 VAN 8  —  0006_discord_admin_roles.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -1025,7 +1025,7 @@ update public.admins set source = 'manual' where source is null;
 create index if not exists admins_source_idx on public.admins (source);
 
 -- ****************************************************************************
--- *  DEEL 7 VAN 7  —  0007_fixes.sql
+-- *  DEEL 7 VAN 8  —  0007_fixes.sql
 -- ****************************************************************************
 
 -- ============================================================================
@@ -1222,5 +1222,61 @@ begin
   select count(*) into v_count from public.members;
   select member_limit into v_limit from public.settings where id = 1;
   raise notice 'Register bevat nu % leden (limiet %).', v_count, v_limit;
+end;
+$$;
+
+-- ****************************************************************************
+-- *  DEEL 8 VAN 8  —  0008_service_role_grants.sql
+-- ****************************************************************************
+
+-- ============================================================================
+-- THE SONDRAVO FAMILY — Official Family Registry
+-- Migratie 0008: rechten voor de service-role
+--
+-- WAT ER MIS WAS
+-- Staat "Automatically expose new tables" uit in Supabase (aan te raden), dan
+-- krijgen nieuwe tabellen géén standaardrechten. Migratie 0002 deelde daarna
+-- wel expliciet rechten uit aan anon en authenticated, maar niet aan
+-- service_role — die zou ze immers "toch al hebben". Zonder die standaard
+-- klopte die aanname niet en hield service_role nul rechten over.
+--
+-- Gevolg: server-side taken die met de service-role werken konden niets. De
+-- Leader-rol uit Discord werd wel herkend, maar de beheerrechten konden niet
+-- worden weggeschreven.
+--
+-- Uitvoeren NA 0007. Idempotent.
+-- ============================================================================
+
+grant usage on schema public to service_role;
+
+grant all privileges on all tables    in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+grant execute       on all functions  in schema public to service_role;
+
+-- Ook voor tabellen die later nog bijkomen.
+alter default privileges in schema public grant all     on tables    to service_role;
+alter default privileges in schema public grant all     on sequences to service_role;
+alter default privileges in schema public grant execute on functions to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Controle
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_zonder_rechten text;
+begin
+  select string_agg(c.relname, ', ')
+    into v_zonder_rechten
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relkind = 'r'
+    and not has_table_privilege('service_role', c.oid, 'INSERT');
+
+  if v_zonder_rechten is null then
+    raise notice 'Service-role heeft nu toegang tot alle tabellen.';
+  else
+    raise notice 'LET OP: nog steeds geen toegang tot: %', v_zonder_rechten;
+  end if;
 end;
 $$;

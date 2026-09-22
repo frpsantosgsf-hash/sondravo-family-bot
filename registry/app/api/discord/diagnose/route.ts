@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminRoleIds, getDiscordSyncConfig, isSupabaseConfigured } from '@/lib/env';
 import { discordIdFromMetadata } from '@/lib/admin-sync';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,31 @@ export async function GET() {
       DISCORD_ADMIN_ROLE_IDS: adminRoleIds.length > 0 ? adminRoleIds : 'ONTBREEKT of ongeldig',
     },
   };
+
+  // Kan de server überhaupt beheerrechten wegschrijven? Zonder die sleutel,
+  // of zonder de juiste rechten in de database, ziet de site de rol wel maar
+  // kan hij er niets mee.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    rapport['4b_service_role'] = 'SUPABASE_SERVICE_ROLE_KEY ONTBREEKT';
+    rapport['CONCLUSIE'] =
+      'SUPABASE_SERVICE_ROLE_KEY ontbreekt in Vercel. Zonder die sleutel kan de site je rechten niet vastleggen. Haal hem op bij Supabase (Project Settings, API Keys, Secret key) en doe daarna een Redeploy.';
+    return NextResponse.json(rapport);
+  }
+
+  try {
+    const { error } = await createAdminClient().from('admins').select('user_id').limit(1);
+    if (error) {
+      rapport['4b_service_role'] = `GEEN TOEGANG TOT DE TABEL (${error.message})`;
+      rapport['CONCLUSIE'] =
+        'De service-role mag niet bij de admins-tabel. Draai migratie 0008_service_role_grants.sql in de Supabase SQL Editor.';
+      return NextResponse.json(rapport);
+    }
+    rapport['4b_service_role'] = 'werkt';
+  } catch {
+    rapport['4b_service_role'] = 'sleutel werkt niet';
+    rapport['CONCLUSIE'] = 'De service-role sleutel wordt niet geaccepteerd door Supabase.';
+    return NextResponse.json(rapport);
+  }
 
   if (!config) {
     rapport['CONCLUSIE'] =
