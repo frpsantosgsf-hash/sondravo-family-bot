@@ -326,32 +326,35 @@ export function ApplicationCard({
           </span>
         </div>
 
-        {/* Losse feiten op één regel, met de stand er tegenover. */}
-        <div className="mt-2.5 flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-[11px] text-muted-soft">
-            {/* "22-09-2026, 18:06" werd op een telefoon afgekapt tot "18:...".
-            "2 uur geleden" past wel, en zegt bij een sollicitatie meer. */}
-            {[row.age ? `${row.age} jaar` : null, row.phone, relativeTime(row.created_at)]
-              .filter(Boolean)
-              .join('  ·  ')}
-          </p>
-
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Teller icoon="check" aantal={stand.ja} toon="groen" />
-            <Teller icoon="cross" aantal={stand.nee} toon="rood" />
-          </div>
+        {/* Alleen de stand hier: leeftijd, telefoon en tijdstip staan in de
+            lijst hieronder, en twee keer hetzelfde leest als ruis. */}
+        <div className="mt-2.5 flex items-center justify-end gap-1.5">
+          <Teller icoon="check" aantal={stand.ja} toon="groen" />
+          <Teller icoon="cross" aantal={stand.nee} toon="rood" />
         </div>
       </div>
 
-      {/* ---------- Inhoud ---------- */}
-      <div className="space-y-3 px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6">
-        <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
-        {row.experience || row.availability ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Veld label="Ervaring in FiveM" waarde={row.experience} />
-            <Veld label="Wanneer online" waarde={row.availability} />
-          </div>
-        ) : null}
+      {/* ---------- De feiten ----------
+
+          Korte gegevens als lijst met een icoon per regel. Dat leest sneller
+          dan een rij losse woorden achter elkaar, en het icoon vertelt al
+          waar je naar kijkt voordat je het label leest. */}
+      <div className="border-b border-line-soft px-3.5 py-2.5 pl-5 sm:px-5 sm:pl-6">
+        <Feit
+          icoon="discord"
+          label="Discord"
+          waarde={row.discord_username ? `@${row.discord_username}` : null}
+        />
+        <Feit icoon="persoon" label="Leeftijd" waarde={row.age ? `${row.age} jaar` : null} />
+        <Feit icoon="telefoon" label="Ingame telefoon" waarde={row.phone} />
+        <Feit icoon="klok" label="Ingestuurd" waarde={relativeTime(row.created_at)} />
+      </div>
+
+      {/* ---------- De antwoorden ---------- */}
+      <div className="space-y-4 px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6">
+        <Veld icoon="quote" label="Waarom Sondravo" waarde={row.motivation} nadruk />
+        <Veld icoon="controller" label="Ervaring in FiveM" waarde={row.experience} />
+        <Veld icoon="kalender" label="Wanneer online" waarde={row.availability} />
       </div>
 
       {/* ---------- Stemmen ----------
@@ -486,11 +489,36 @@ export function ApplicationCard({
   );
 }
 
+/** Eén korte regel: icoon, waar het over gaat, en het antwoord. */
+function Feit({
+  icoon,
+  label,
+  waarde,
+}: {
+  icoon: IcoonNaam;
+  label: string;
+  waarde: string | null;
+}) {
+  if (!waarde) return null;
+  return (
+    <div className="flex items-center gap-2.5 border-b border-line-soft/60 py-1.5 last:border-0">
+      <span className="shrink-0 text-muted-soft">
+        <Icoon soort={icoon} />
+      </span>
+      <span className="text-[11px] uppercase tracking-[0.1em] text-muted">{label}</span>
+      <span className="ml-auto truncate text-right text-[13px] text-ink/90">{waarde}</span>
+    </div>
+  );
+}
+
+/** Een open antwoord: kopje met icoon, tekst eronder. */
 function Veld({
+  icoon,
   label,
   waarde,
   nadruk = false,
 }: {
+  icoon: IcoonNaam;
   label: string;
   waarde: string | null;
   nadruk?: boolean;
@@ -498,9 +526,14 @@ function Veld({
   if (!waarde) return null;
   return (
     <div>
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">{label}</p>
+      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
+        <span className="text-muted-soft">
+          <Icoon soort={icoon} />
+        </span>
+        {label}
+      </p>
       <p
-        className={`mt-1 whitespace-pre-wrap text-sm leading-relaxed ${
+        className={`mt-1.5 whitespace-pre-wrap pl-[22px] text-sm leading-relaxed ${
           nadruk ? 'text-ink/90' : 'text-ink/70'
         }`}
       >
@@ -572,19 +605,96 @@ function StemKnop({
   );
 }
 
-function Icoon({ soort }: { soort: 'check' | 'cross' }) {
+/** De iconen die op een sollicitatiekaart voorkomen. */
+type IcoonNaam =
+  | 'check'
+  | 'cross'
+  | 'discord'
+  | 'persoon'
+  | 'telefoon'
+  | 'klok'
+  | 'quote'
+  | 'controller'
+  | 'kalender';
+
+/**
+ * Eén set lijniconen, allemaal op hetzelfde raster van 16 bij 16 en met
+ * dezelfde lijndikte. Dat is waarom ze hier met de hand staan in plaats van
+ * uit een pakket te komen: geleende iconen hebben elk hun eigen gewicht, en
+ * dan oogt een rijtje onder elkaar rommelig.
+ */
+function Icoon({ soort }: { soort: IcoonNaam }) {
+  const gemeenschappelijk = {
+    viewBox: '0 0 16 16',
+    'aria-hidden': true,
+    className: 'h-3.5 w-3.5',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  if (soort === 'discord') {
+    // Het Discord-merkteken is een vlak, geen lijn.
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-3.5 w-3.5" fill="currentColor">
+        <path d="M20.3 4.6A19 19 0 0 0 15.6 3l-.3.5a14 14 0 0 1 4 2 13.6 13.6 0 0 0-11.7 0 14 14 0 0 1 4-2L11.4 3A19 19 0 0 0 6.7 4.6C3.7 9 2.9 13.3 3.3 17.5a19 19 0 0 0 5.7 2.9l1.2-1.7a12.3 12.3 0 0 1-1.9-.9l.5-.4a13.6 13.6 0 0 0 11.6 0l.5.4c-.6.4-1.3.7-2 .9l1.2 1.7a19 19 0 0 0 5.8-2.9c.5-4.9-.8-9.1-3.6-12.9ZM9.7 15c-1.1 0-2-1-2-2.3s.9-2.3 2-2.3 2 1 2 2.3-.9 2.3-2 2.3Zm4.6 0c-1.1 0-2-1-2-2.3s.9-2.3 2-2.3 2 1 2 2.3-.9 2.3-2 2.3Z" />
+      </svg>
+    );
+  }
+
+  if (soort === 'check' || soort === 'cross') {
+    return (
+      <svg {...gemeenschappelijk} strokeWidth="2.2">
+        {soort === 'check' ? <path d="M3 8.5l3.5 3.5L13 5" /> : <path d="M4 4l8 8M12 4l-8 8" />}
+      </svg>
+    );
+  }
+
   return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {soort === 'check' ? <path d="M3 8.5l3.5 3.5L13 5" /> : <path d="M4 4l8 8M12 4l-8 8" />}
+    <svg {...gemeenschappelijk} strokeWidth="1.5">
+      {soort === 'persoon' ? (
+        <>
+          <circle cx="8" cy="5" r="2.6" />
+          <path d="M2.8 14c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4" />
+        </>
+      ) : null}
+
+      {soort === 'telefoon' ? (
+        <>
+          <rect x="4.5" y="1.5" width="7" height="13" rx="1.6" />
+          <path d="M7 3.2h2" />
+          <path d="M7.4 12.3h1.2" />
+        </>
+      ) : null}
+
+      {soort === 'klok' ? (
+        <>
+          <circle cx="8" cy="8" r="6.2" />
+          <path d="M8 4.4V8l2.4 1.6" />
+        </>
+      ) : null}
+
+      {soort === 'quote' ? (
+        <>
+          <path d="M2 12.5V6.8C2 5.2 3.2 4 4.8 4h6.4C12.8 4 14 5.2 14 6.8v2.4c0 1.6-1.2 2.8-2.8 2.8H6l-4 2.5Z" />
+        </>
+      ) : null}
+
+      {soort === 'controller' ? (
+        <>
+          <path d="M5.2 4.5h5.6c1.9 0 3.2 1.6 3.4 3.4l.3 2.6c.2 1.4-.9 2.5-2.1 2.1-.8-.3-1.3-.9-1.8-1.6H5.4c-.5.7-1 1.3-1.8 1.6-1.2.4-2.3-.7-2.1-2.1l.3-2.6C2 6.1 3.3 4.5 5.2 4.5Z" />
+          <path d="M4.5 7.6v1.8M3.6 8.5h1.8" />
+          <path d="M11 7.9h.01M12.2 9.2h.01" strokeWidth="1.8" />
+        </>
+      ) : null}
+
+      {soort === 'kalender' ? (
+        <>
+          <rect x="2" y="3.2" width="12" height="11" rx="1.6" />
+          <path d="M2 6.6h12M5.4 1.8v2.6M10.6 1.8v2.6" />
+        </>
+      ) : null}
     </svg>
   );
 }
