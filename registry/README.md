@@ -83,7 +83,8 @@ registry/
 │   ├── discord.ts               Discord API (server-only)
 │   └── video.ts                 YouTube/bestand-herkenning voor de clip
 ├── supabase/
-│   ├── migrations/              7 SQL-bestanden, in volgorde uitvoeren
+│   ├── setup.sql                Alles-in-één: dit draai je in Supabase
+│   ├── migrations/              Dezelfde opzet, opgeknipt per stap
 │   ├── verify_rls.sql           Controlescript voor de beveiliging
 │   └── README.md
 ├── types/                       Database- en app-types
@@ -101,28 +102,41 @@ praten nooit rechtstreeks met de database.
 Ga naar [supabase.com](https://supabase.com) → **New project**. Kies een
 regio in Europa (bijv. Frankfurt). Bewaar het databasewachtwoord.
 
-### 2. SQL-migraties uitvoeren
-Open **SQL Editor → New query** en voer deze vier bestanden **in deze volgorde**
-uit. Plak de inhoud, klik **Run**, en ga pas daarna naar het volgende bestand.
+### 2. De database vullen
+
+Open **SQL Editor → New query**, plak de inhoud van
+**`registry/supabase/setup.sql`** en klik op **Run**. Eén keer, klaar.
+
+Onderaan verschijnt:
+
+```
+NOTICE:  Register bevat nu 20 leden (limiet 20).
+```
+
+Staat die melding er, dan is alles goed gegaan.
+
+`setup.sql` is veilig om opnieuw te draaien: er ontstaan geen dubbele leden en
+wat een admin heeft aangepast blijft staan.
+
+<details>
+<summary>Liever de losse migraties?</summary>
+
+`setup.sql` is samengesteld uit de zeven bestanden in `supabase/migrations/`.
+Die kun je ook los draaien, **in deze volgorde**:
 
 | # | Bestand | Wat het doet |
 |---|---------|--------------|
-| 1 | `supabase/migrations/0001_schema.sql` | Tabellen, functies, audit-triggers |
-| 2 | `supabase/migrations/0002_rls_policies.sql` | Row Level Security, rechten, admin-RPC's |
-| 3 | `supabase/migrations/0003_seed.sql` | De 9 rangen + onze 20 leden + capaciteit 20 |
-| 4 | `supabase/migrations/0004_bot_bridge.sql` | Koppeling voor `/new` in Discord |
-| 5 | `supabase/migrations/0005_rank_colors.sql` | De kleur van elke Discord-rol |
-| 6 | `supabase/migrations/0006_discord_admin_roles.sql` | Beheerrechten via de Leader-rol |
-| 7 | `supabase/migrations/0007_fixes.sql` | Twee reparaties (zie hieronder) |
+| 1 | `0001_schema.sql` | Tabellen, functies, slug/updated_at/audit-triggers |
+| 2 | `0002_rls_policies.sql` | Row Level Security, rechten, admin-RPC's |
+| 3 | `0003_seed.sql` | Rangladder + de huidige 20 leden + capaciteit |
+| 4 | `0004_bot_bridge.sql` | Koppeling voor `/new` in Discord |
+| 5 | `0005_rank_colors.sql` | De kleur van elke Discord-rol |
+| 6 | `0006_discord_admin_roles.sql` | Beheerrechten via de Leader-rol |
+| 7 | `0007_fixes.sql` | Twee reparaties — overslaan kan niet |
 
-Alle zeven zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
-Dat is ook echt getest — de zeven bestanden zijn drie keer achter elkaar
-gedraaid en het register bleef op 20 leden staan.
+Pas je iets aan in `migrations/`, genereer `setup.sql` dan opnieuw.
 
-> **Bestand 7 is geen optie maar een must.** Het repareert twee fouten die in
-> de eerdere bestanden zaten: de seed maakte bij een tweede run dubbele leden
-> aan, en het `/new`-commando van de bot brak af. Draai je alles in één keer in
-> volgorde, dan merk je er niets van.
+</details>
 
 ### 3. Discord Developer Application maken
 Ga naar [discord.com/developers/applications](https://discord.com/developers/applications)
@@ -513,7 +527,7 @@ Alles wat code is, is klaar. Dit kan ik niet voor je doen omdat er accounts en
 geheimen bij komen kijken:
 
 - [ ] Supabase-project aanmaken (stap 1)
-- [ ] De zeven SQL-bestanden draaien (stap 2)
+- [ ] `supabase/setup.sql` één keer draaien (stap 2)
 - [ ] Discord Developer Application aanmaken + redirect URL (stap 3 en 4)
 - [ ] Discord-provider in Supabase aanzetten (stap 5)
 - [ ] Eén keer inloggen en jezelf in `admins` zetten (stap 7 t/m 9)
