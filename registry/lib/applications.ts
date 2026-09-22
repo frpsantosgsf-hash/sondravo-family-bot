@@ -157,90 +157,154 @@ export async function verwijderDiscordBericht(messageId: string | null): Promise
 }
 
 /**
- * Meldt een nieuwe sollicitatie in Discord.
+ * Bewerkt een eerder geplaatst bericht.
  *
- * Mag nooit de inzending laten mislukken: als de webhook eruit ligt, staat de
- * sollicitatie nog steeds netjes op de site.
+ * Zo groeit één bericht mee met de sollicitatie in plaats van dat er bij elke
+ * stem en elk besluit een nieuwe melding onder komt. Het kanaal blijft dan
+ * leesbaar, en de stand staat altijd op één plek.
  */
-export async function notifyDiscord(
-  input: ApplicationInput,
-  access: ViewerAccess,
-): Promise<string | null> {
-  const stijl = STATUS_STIJL['nieuw']!;
+async function bewerkDiscordBericht(
+  messageId: string,
+  embed: Record<string, unknown>,
+): Promise<boolean> {
+  const webhookUrl = getApplicationWebhookUrl();
+  if (!webhookUrl) return false;
 
-  // De korte gegevens naast elkaar, de verhalen eronder. Discord zet drie
-  // inline-velden op één regel, dus dit blijft ook op een telefoon leesbaar.
-  const velden: { name: string; value: string; inline?: boolean }[] = [
-    { name: 'Leeftijd', value: input.age ? String(input.age) : '—', inline: true },
-    { name: 'Ingame telefoon', value: input.phone || '—', inline: true },
-    {
-      name: 'Discord',
-      value: access.discord.userId ? `<@${access.discord.userId}>` : '—',
-      inline: true,
-    },
-    { name: '\u200b', value: `**Waarom Sondravo**\n${knip(input.motivation, 900)}` },
-  ];
-
-  if (input.experience) {
-    velden.push({ name: '\u200b', value: `**Ervaring in FiveM**\n${knip(input.experience, 900)}` });
-  }
-  if (input.availability) {
-    velden.push({
-      name: '\u200b',
-      value: `**Wanneer online**\n${knip(input.availability, 900)}`,
+  try {
+    const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed], allowed_mentions: { parse: [] } }),
     });
+    return response.ok;
+  } catch {
+    return false;
   }
+}
 
-  return stuurNaarDiscord({
-    author: {
-      name: input.name,
-      icon_url: access.discord.avatarUrl ?? undefined,
-    },
-    title: stijl.kop,
-    url: `${getSiteUrl()}/sollicitaties`,
-    description: 'Leden kunnen stemmen op de site. De Lead beslist.',
-    color: stijl.kleur,
-    timestamp: new Date().toISOString(),
-    thumbnail: access.discord.avatarUrl ? { url: access.discord.avatarUrl } : undefined,
-    fields: velden,
-    footer: { text: 'sondravo-family.nl  ·  Stemmen kan bij Sollicitaties' },
-  });
+/** Kapt een tekst af zodat hij binnen de limiet van Discord past. */
+function knip(waarde: string, max: number): string {
+  return waarde.length <= max ? waarde : `${waarde.slice(0, max - 1)}…`;
+}
+
+/** De gegevens die het Discord-bericht nodig heeft. */
+export interface DiscordSollicitatie {
+  name: string;
+  status: string;
+  age: number | null;
+  phone: string | null;
+  motivation: string;
+  experience: string | null;
+  availability: string | null;
+  discord_user_id: string | null;
+  avatar_url: string | null;
+  handled_by: string | null;
+  voting_closed: boolean;
 }
 
 /**
- * Meldt in Discord dat een sollicitatie is afgehandeld.
- *
- * Kort en met de kleur van de uitkomst, zodat het kanaal in één blik laat
- * zien wat er met iemand gebeurd is zonder dat je de site hoeft te openen.
+ * Bouwt het hele bericht op uit de sollicitatie zoals hij nu in de database
+ * staat. Eén functie voor zowel het eerste bericht als elke bewerking daarna,
+ * zodat de twee nooit uit elkaar kunnen lopen.
  */
-export async function notifyDiscordStatus(
-  row: Pick<ApplicationRow, 'name' | 'status' | 'discord_user_id' | 'avatar_url' | 'handled_by'>,
-  stemmen?: { ja: number; nee: number },
-): Promise<string | null> {
-  const stijl = STATUS_STIJL[row.status];
-  if (!stijl) return null;
+function bouwEmbed(
+  row: DiscordSollicitatie,
+  stemmen: { ja: number; nee: number },
+): Record<string, unknown> {
+  const stijl = STATUS_STIJL[row.status] ?? STATUS_STIJL['nieuw']!;
 
   const velden: { name: string; value: string; inline?: boolean }[] = [
+    { name: 'Leeftijd', value: row.age ? String(row.age) : '—', inline: true },
+    { name: 'Ingame telefoon', value: row.phone || '—', inline: true },
     {
       name: 'Discord',
       value: row.discord_user_id ? `<@${row.discord_user_id}>` : '—',
       inline: true,
     },
-    { name: 'Besloten door', value: row.handled_by || '—', inline: true },
+    { name: '\u200b', value: `**Waarom Sondravo**\n${knip(row.motivation, 900)}` },
   ];
 
-  if (stemmen) {
-    velden.push({ name: 'Stemmen', value: `✅ ${stemmen.ja}   ❌ ${stemmen.nee}`, inline: true });
+  if (row.experience) {
+    velden.push({ name: '\u200b', value: `**Ervaring in FiveM**\n${knip(row.experience, 900)}` });
+  }
+  if (row.availability) {
+    velden.push({ name: '\u200b', value: `**Wanneer online**\n${knip(row.availability, 900)}` });
   }
 
-  return stuurNaarDiscord({
+  // De stand onderaan, waar hij meegroeit met elke stem.
+  const totaal = stemmen.ja + stemmen.nee;
+  const staat = row.voting_closed ? ' · gesloten' : '';
+  velden.push({
+    name: '\u200b',
+    value:
+      `**Stemmen**\n✅ ${stemmen.ja}   ❌ ${stemmen.nee}` +
+      (totaal === 0 && !row.voting_closed
+        ? '\n_Nog niemand heeft gestemd._'
+        : `\n_${totaal} ${totaal === 1 ? 'stem' : 'stemmen'}${staat}._`),
+  });
+
+  if (row.handled_by) {
+    velden.push({ name: 'Besloten door', value: row.handled_by, inline: true });
+  }
+
+  return {
     author: { name: row.name, icon_url: row.avatar_url ?? undefined },
     title: stijl.kop,
+    url: `${getSiteUrl()}/sollicitaties`,
     color: stijl.kleur,
     timestamp: new Date().toISOString(),
+    thumbnail: row.avatar_url ? { url: row.avatar_url } : undefined,
     fields: velden,
-    footer: { text: 'sondravo-family.nl' },
-  });
+    footer: { text: 'sondravo-family.nl  ·  Stemmen kan bij Sollicitaties' },
+  };
+}
+
+/**
+ * Plaatst het eerste bericht van een sollicitatie en geeft het bericht-ID
+ * terug. Mag nooit de inzending laten mislukken: ligt de webhook eruit, dan
+ * staat de sollicitatie nog steeds netjes op de site.
+ */
+export async function notifyDiscord(row: DiscordSollicitatie): Promise<string | null> {
+  return stuurNaarDiscord(bouwEmbed(row, { ja: 0, nee: 0 }));
+}
+
+/**
+ * Werkt het bestaande bericht bij naar de huidige stand van zaken.
+ *
+ * Wordt aangeroepen na elke stem en na elk besluit. Loopt via de service-role
+ * client omdat een stemmend lid de sollicitatie wel mag zien maar niet alle
+ * velden, en omdat dit hoe dan ook server-werk is.
+ */
+export async function syncDiscordBericht(applicationId: string): Promise<void> {
+  if (!getApplicationWebhookUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+
+  try {
+    const supabase = createAdminClient();
+
+    const { data: row } = await supabase
+      .from('applications')
+      .select('*')
+      .eq('id', applicationId)
+      .maybeSingle();
+
+    if (!row?.discord_message_id) return;
+
+    const { data: stemRijen } = await supabase
+      .from('application_votes')
+      .select('vote')
+      .eq('application_id', applicationId);
+
+    await bewerkDiscordBericht(
+      row.discord_message_id,
+      bouwEmbed(row, {
+        ja: (stemRijen ?? []).filter((stem) => stem.vote === 'ja').length,
+        nee: (stemRijen ?? []).filter((stem) => stem.vote === 'nee').length,
+      }),
+    );
+  } catch {
+    // Het bericht in Discord loopt dan achter. Vervelend, maar geen reden om
+    // een stem of een besluit te laten mislukken.
+  }
 }
 
 /**
@@ -270,10 +334,6 @@ export async function getMyApplication(): Promise<ApplicationRow | null> {
     .maybeSingle();
 
   return data ?? null;
-}
-
-function knip(waarde: string, max: number): string {
-  return waarde.length <= max ? waarde : `${waarde.slice(0, max - 1)}…`;
 }
 
 export type { ApplicationRow };

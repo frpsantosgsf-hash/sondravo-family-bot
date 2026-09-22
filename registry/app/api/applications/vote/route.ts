@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
+import { syncDiscordBericht } from '@/lib/applications';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: 'Je stem intrekken lukte niet.' }, { status: 500 });
     }
+
+    await syncDiscordBericht(applicationId);
     return NextResponse.json({ ok: true });
   }
 
@@ -77,6 +80,9 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: 'Stemmen lukte niet.' }, { status: 500 });
   }
+
+  // De stand in het Discord-bericht groeit mee met elke stem.
+  await syncDiscordBericht(applicationId);
 
   return NextResponse.json({ ok: true });
 }

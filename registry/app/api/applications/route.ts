@@ -4,11 +4,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
-import {
-  notifyDiscordStatus,
-  onthoudDiscordBericht,
-  verwijderDiscordBericht,
-} from '@/lib/applications';
+import { syncDiscordBericht, verwijderDiscordBericht } from '@/lib/applications';
 import type { ApplicationRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -158,6 +154,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'De stemming bijwerken lukte niet.' }, { status: 500 });
     }
 
+    await syncDiscordBericht(input.id);
     revalidatePath('/sollicitaties');
     return NextResponse.json({ ok: true });
   }
@@ -185,7 +182,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const { data: row, error } = await supabase.rpc('admin_set_application_status', {
+  const { error } = await supabase.rpc('admin_set_application_status', {
     p_id: input.id,
     p_status: input.status,
     p_note: input.note ?? null,
@@ -195,26 +192,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Bijwerken is niet gelukt.' }, { status: 500 });
   }
 
-  // Het kanaal in Discord hoort de uitkomst ook te zien, met de stand van de
-  // stemming erbij. Mislukt die melding, dan is het besluit nog steeds genomen.
-  if (row) {
-    const { data: stemRijen } = await supabase
-      .from('application_votes')
-      .select('vote')
-      .eq('application_id', input.id);
-
-    const messageId = await notifyDiscordStatus(row, {
-      ja: (stemRijen ?? []).filter((stem) => stem.vote === 'ja').length,
-      nee: (stemRijen ?? []).filter((stem) => stem.vote === 'nee').length,
-    });
-
-    if (messageId) {
-      // Een vorige statusmelding vervangen we: anders staan er bij een besluit
-      // dat twee keer wisselt drie berichten over dezelfde persoon.
-      await verwijderDiscordBericht(row.discord_status_message_id);
-      await onthoudDiscordBericht(input.id, null, messageId);
-    }
-  }
+  // Het bestaande bericht in Discord groeit mee: kleur, kop en de stand
+  // worden bijgewerkt. Zo staat er één bericht per sollicitatie in plaats van
+  // een stapel meldingen over dezelfde persoon.
+  await syncDiscordBericht(input.id);
 
   revalidatePath('/leden');
   revalidatePath('/sollicitaties');

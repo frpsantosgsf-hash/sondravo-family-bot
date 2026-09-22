@@ -116,7 +116,19 @@ export async function submitApplicationAction(
   // De melding in Discord mag de inzending nooit laten mislukken. Het
   // bericht-ID onthouden we wel, zodat het bericht later weer uit het kanaal
   // kan verdwijnen als de Lead de sollicitatie archiveert.
-  const messageId = await notifyDiscord(parsed.data, access);
+  const messageId = await notifyDiscord({
+    name: parsed.data.name,
+    status: 'nieuw',
+    age: parsed.data.age,
+    phone: parsed.data.phone ?? null,
+    motivation: parsed.data.motivation,
+    experience: parsed.data.experience ?? null,
+    availability: parsed.data.availability ?? null,
+    discord_user_id: access.discord.userId,
+    avatar_url: access.discord.avatarUrl,
+    handled_by: null,
+    voting_closed: false,
+  });
   if (messageId) {
     await onthoudDiscordBericht(opgeslagen.id, messageId, null);
   }
