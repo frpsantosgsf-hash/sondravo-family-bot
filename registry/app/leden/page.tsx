@@ -50,7 +50,7 @@ export default async function LedenPage() {
 
             {!access.signedIn ? (
               <div className="mt-6 flex justify-center">
-                <AuthControls viewer={null} next="/leden" />
+                <AuthControls viewer={null} next="/leden" label="Inloggen met Discord" />
               </div>
             ) : mayApply(access) ? (
               <Link

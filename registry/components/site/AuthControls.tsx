@@ -10,13 +10,24 @@ interface AuthControlsProps {
   /** Pad waar de bezoeker na in- of uitloggen terechtkomt. */
   next: string;
   disabled?: boolean;
+  /**
+   * Tekst op de inlogknop. Standaard "Lead login", want in de balk bovenaan
+   * is dat de enige reden om in te loggen. Op het sollicitatieformulier klopt
+   * dat woord juist niet: daar logt een buitenstaander in, geen Lead.
+   */
+  label?: string;
 }
 
 /**
- * Rechtsboven: de subtiele "Lead login"-knop, of de status van de ingelogde
- * Lead met een uitlogknop.
+ * Rechtsboven: de subtiele inlogknop, of de status van de ingelogde
+ * bezoeker met een uitlogknop.
  */
-export function AuthControls({ viewer, next, disabled = false }: AuthControlsProps) {
+export function AuthControls({
+  viewer,
+  next,
+  disabled = false,
+  label = 'Lead login',
+}: AuthControlsProps) {
   const [pending, setPending] = useState(false);
 
   if (!viewer) {
@@ -29,7 +40,7 @@ export function AuthControls({ viewer, next, disabled = false }: AuthControlsPro
           className="tap-target group inline-flex items-center gap-2 rounded-lg border border-line bg-panel-high/80 px-3 text-[13px] text-muted transition-all duration-150 hover:border-creme/25 hover:bg-panel-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-55"
         >
           {pending ? <Spinner /> : <DiscordGlyph />}
-          <span className="hidden sm:inline">Lead login</span>
+          <span className="hidden sm:inline">{label}</span>
           <span className="sm:hidden">Login</span>
         </button>
       </form>

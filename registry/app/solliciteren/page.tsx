@@ -45,11 +45,20 @@ export default async function SolliciterenPage() {
           {!access.signedIn ? (
             <Kader>
               <p className="text-sm leading-relaxed text-ink/80">
-                Om te kunnen solliciteren log je eerst in met Discord. Zo weten we zeker met wie we
-                te maken hebben, en hoef jij je gegevens niet twee keer achter te laten.
+                Om te kunnen solliciteren log je eerst in met je eigen Discord-account. Zo weten we
+                zeker met wie we te maken hebben, en hoef jij je gegevens niet twee keer achter te
+                laten.
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                Je moet daarvoor wel in onze Discord-server zitten en de juiste rol hebben. Heb je
+                die nog niet, vraag er dan eerst om in de server.
               </p>
               <div className="mt-5">
-                <AuthControls viewer={null} next="/solliciteren" />
+                <AuthControls
+                  viewer={null}
+                  next="/solliciteren"
+                  label="Inloggen met Discord"
+                />
               </div>
             </Kader>
           ) : access.discordUnavailable ? (
