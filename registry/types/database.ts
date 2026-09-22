@@ -158,6 +158,22 @@ export interface Database {
         };
         Relationships: [];
       };
+      application_votes: {
+        Row: {
+          application_id: string;
+          voter_id: string;
+          vote: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          application_id: string;
+          voter_id: string;
+          vote: string;
+        };
+        Update: { vote?: string };
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -234,3 +250,4 @@ export type SettingsRow = Database['public']['Tables']['settings']['Row'];
 export type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
 export type PrivateMemberRow = Database['public']['Tables']['private_member_data']['Row'];
 export type ApplicationRow = Database['public']['Tables']['applications']['Row'];
+export type ApplicationVoteRow = Database['public']['Tables']['application_votes']['Row'];

@@ -5,6 +5,8 @@ import { ApplicationForm } from '@/components/site/ApplicationForm';
 import { AuthControls } from '@/components/site/AuthControls';
 import { getViewerAccess, mayApply, mayViewRegistry } from '@/lib/access';
 import { getRegistryData } from '@/lib/data';
+import { getMyApplication } from '@/lib/applications';
+import { formatDateTime } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +24,53 @@ function Kader({ children }: { children: React.ReactNode }) {
   );
 }
 
+const STATUS_TEKST: Record<string, { kop: string; uitleg: string; toon: string }> = {
+  nieuw: {
+    kop: 'Je sollicitatie staat open',
+    uitleg:
+      'Hij is binnen en de familie kijkt ernaar. Je hoort het via Discord zodra er een besluit is.',
+    toon: 'border-sondravo-green/40 bg-sondravo-green/10',
+  },
+  in_behandeling: {
+    kop: 'Je sollicitatie wordt bekeken',
+    uitleg: 'Een Lead is ermee bezig. Je hoort het via Discord zodra er een besluit is.',
+    toon: 'border-creme/30 bg-creme/5',
+  },
+  aangenomen: {
+    kop: 'Je bent aangenomen',
+    uitleg: 'Welkom bij de familie. Een Lead neemt contact met je op in Discord.',
+    toon: 'border-sondravo-green/40 bg-sondravo-green/10',
+  },
+  afgewezen: {
+    kop: 'Je sollicitatie is afgewezen',
+    uitleg: 'Je mag het later opnieuw proberen — vul het formulier hieronder dan gewoon nog eens in.',
+    toon: 'border-sondravo-red/35 bg-sondravo-red/10',
+  },
+};
+
+function StatusKaart({ status, ingestuurdOp }: { status: string; ingestuurdOp: string }) {
+  const tekst = STATUS_TEKST[status];
+  if (!tekst) return null;
+
+  return (
+    <div role="status" className={`rounded-xl border px-5 py-6 text-center ${tekst.toon}`}>
+      <p className="text-[13px] font-medium uppercase tracking-[0.16em] text-creme">{tekst.kop}</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink/80">{tekst.uitleg}</p>
+      <p className="mt-3 text-xs text-muted">Ingestuurd op {formatDateTime(ingestuurdOp)}.</p>
+    </div>
+  );
+}
+
 export default async function SolliciterenPage() {
-  const [access, { settings, viewer }] = await Promise.all([getViewerAccess(), getRegistryData()]);
+  const [access, { settings, viewer }, mijn] = await Promise.all([
+    getViewerAccess(),
+    getRegistryData(),
+    getMyApplication(),
+  ]);
 
   const toegang = mayApply(access);
+  // Een afgehandelde sollicitatie blokkeert niets meer: dan mag je opnieuw.
+  const staatOpen = mijn !== null && ['nieuw', 'in_behandeling'].includes(mijn.status);
 
   return (
     <>
@@ -80,10 +125,17 @@ export default async function SolliciterenPage() {
                 meteen verder.
               </p>
             </Kader>
+          ) : staatOpen && mijn ? (
+            <StatusKaart status={mijn.status} ingestuurdOp={mijn.created_at} />
           ) : (
-            <Kader>
-              <ApplicationForm />
-            </Kader>
+            <>
+              {mijn ? <StatusKaart status={mijn.status} ingestuurdOp={mijn.created_at} /> : null}
+              <div className={mijn ? 'mt-5' : ''}>
+                <Kader>
+                  <ApplicationForm />
+                </Kader>
+              </div>
+            </>
           )}
         </div>
       </main>

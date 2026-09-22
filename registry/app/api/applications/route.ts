@@ -3,20 +3,32 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getViewerAccess, mayViewRegistry } from '@/lib/access';
+import type { ApplicationRow } from '@/types/database';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** De stand van de stemming bij één sollicitatie. */
+export interface VoteTally {
+  ja: number;
+  nee: number;
+  /** Wat de bezoeker zelf gestemd heeft, of null. */
+  mine: 'ja' | 'nee' | null;
+}
+
 /**
- * Sollicitaties lezen en afhandelen. Alleen voor Lead/Admin.
+ * Sollicitaties ophalen.
  *
- * Row Level Security houdt de tabel sowieso dicht; deze controle is de tweede
- * grendel, zodat een fout in één van de twee niet meteen de deur openzet.
+ * Een Lead ziet alles, inclusief wat al is afgehandeld. Een lid ziet alleen
+ * wat nog openstaat — Row Level Security zorgt daarvoor, deze route hoeft dat
+ * niet na te bouwen. Afgewezen sollicitaties blijven zo binnen de leiding.
  */
 export async function GET() {
-  const gate = await requireAdmin();
-  if (!gate.ok) {
-    return NextResponse.json({ error: gate.error }, { status: 403 });
+  const access = await getViewerAccess();
+
+  if (!mayViewRegistry(access)) {
+    return NextResponse.json({ error: 'Geen toegang.' }, { status: 403 });
   }
 
   const supabase = await createClient();
@@ -30,7 +42,48 @@ export async function GET() {
     return NextResponse.json({ error: 'Kon de sollicitaties niet ophalen.' }, { status: 500 });
   }
 
-  return NextResponse.json({ applications: data ?? [] });
+  const applications = (data ?? []) as ApplicationRow[];
+  const votes = await tallyVotes(supabase, applications);
+
+  return NextResponse.json({ applications, votes, isAdmin: access.isAdmin });
+}
+
+/** Telt de stemmen per sollicitatie, en onthoudt wat je zelf koos. */
+async function tallyVotes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  applications: ApplicationRow[],
+): Promise<Record<string, VoteTally>> {
+  const tally: Record<string, VoteTally> = {};
+  if (applications.length === 0) return tally;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: rows } = await supabase
+    .from('application_votes')
+    .select('application_id, voter_id, vote')
+    .in(
+      'application_id',
+      applications.map((row) => row.id),
+    );
+
+  for (const application of applications) {
+    tally[application.id] = { ja: 0, nee: 0, mine: null };
+  }
+
+  for (const row of rows ?? []) {
+    const stand = tally[row.application_id];
+    if (!stand) continue;
+
+    if (row.vote === 'ja') stand.ja += 1;
+    if (row.vote === 'nee') stand.nee += 1;
+    if (user && row.voter_id === user.id) {
+      stand.mine = row.vote === 'ja' ? 'ja' : 'nee';
+    }
+  }
+
+  return tally;
 }
 
 const patchSchema = z.object({
@@ -39,6 +92,7 @@ const patchSchema = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
+/** Afhandelen. Alleen de Lead beslist; stemmen van leden zijn advies. */
 export async function PATCH(request: NextRequest) {
   const gate = await requireAdmin();
   if (!gate.ok) {
@@ -72,5 +126,6 @@ export async function PATCH(request: NextRequest) {
   }
 
   revalidatePath('/leden');
+  revalidatePath('/sollicitaties');
   return NextResponse.json({ ok: true });
 }

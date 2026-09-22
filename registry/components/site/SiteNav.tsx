@@ -6,7 +6,7 @@ import type { Viewer } from '@/types';
 interface SiteNavProps {
   viewer: Viewer | null;
   /** Huidige pagina, bepaalt de actieve link en waar login naartoe stuurt. */
-  current: '/' | '/leden' | '/solliciteren';
+  current: '/' | '/leden' | '/solliciteren' | '/sollicitaties';
   /** De ledenlijst staat alleen in het menu voor wie hem ook mag openen. */
   showRegistry?: boolean;
 }
@@ -38,6 +38,19 @@ export function SiteNav({ viewer, current, showRegistry = true }: SiteNavProps) 
               }`}
             >
               Ledenlijst
+            </Link>
+          ) : null}
+          {showRegistry ? (
+            <Link
+              href="/sollicitaties"
+              aria-current={current === '/sollicitaties' ? 'page' : undefined}
+              className={`tap-target hidden items-center rounded-lg px-3 text-[13px] font-medium uppercase tracking-[0.16em] transition-all duration-150 sm:inline-flex ${
+                current === '/sollicitaties'
+                  ? 'bg-creme/10 text-creme'
+                  : 'text-muted hover:bg-panel-high hover:text-ink'
+              }`}
+            >
+              Sollicitaties
             </Link>
           ) : null}
           <AuthControls viewer={viewer} next={current} />

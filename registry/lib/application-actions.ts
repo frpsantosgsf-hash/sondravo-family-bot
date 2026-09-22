@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayApply } from '@/lib/access';
 import { applicationSchema, notifyDiscord, saveApplication } from '@/lib/applications';
@@ -99,8 +98,15 @@ export async function submitApplicationAction(
   // De melding in Discord mag de inzending nooit laten mislukken.
   await notifyDiscord(parsed.data, access);
 
-  revalidatePath('/solliciteren');
-  revalidatePath('/leden');
+  /*
+   * Bewust géén revalidatePath('/solliciteren'): die liet de pagina opnieuw
+   * laden, waardoor het formulier opnieuw werd opgebouwd en de bevestiging
+   * meteen weer van het scherm verdween. Je zag dan een leeg formulier en
+   * wist niet of je inzending was aangekomen.
+   *
+   * De Lead haalt zijn overzicht met cache: 'no-store' op, dus daar is niets
+   * ongeldig te maken.
+   */
 
   return { ok: true, message: 'Je sollicitatie is verstuurd. Een Lead kijkt ernaar.' };
 }

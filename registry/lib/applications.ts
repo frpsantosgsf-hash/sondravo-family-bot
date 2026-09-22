@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { getApplicationWebhookUrl, getSiteUrl } from '@/lib/env';
 import type { ViewerAccess } from '@/lib/access';
 import type { ApplicationRow } from '@/types/database';
@@ -140,6 +141,35 @@ export async function notifyDiscord(input: ApplicationInput, access: ViewerAcces
   } catch {
     // Stilte is hier het juiste gedrag: de sollicitatie is al opgeslagen.
   }
+}
+
+/**
+ * De eigen sollicitatie van de ingelogde bezoeker, als die er is.
+ *
+ * Zo weet de pagina zélf dat er al iets is ingestuurd, ook als je hem morgen
+ * opnieuw opent. Een melding die alleen op het scherm blijft staan tot je
+ * ververst, is geen bevestiging maar een fopspeen.
+ *
+ * Row Level Security laat alleen je eigen rij door; ook zonder deze filter
+ * zou je nooit die van een ander te zien krijgen.
+ */
+export async function getMyApplication(): Promise<ApplicationRow | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('auth_user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data ?? null;
 }
 
 function knip(waarde: string, max: number): string {
