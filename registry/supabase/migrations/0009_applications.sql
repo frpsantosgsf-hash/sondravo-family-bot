@@ -139,7 +139,13 @@ as $$
 declare
   v_id uuid;
 begin
-  if current_user <> 'service_role' then
+  -- Let op: bij SECURITY DEFINER is current_user de EIGENAAR van de functie,
+  -- niet de aanroeper. De rol die PostgREST heeft gezet staat in de
+  -- 'role'-instelling; current_user dient als terugval voor psql en de
+  -- SQL Editor. De echte grendel is de grant hieronder: alleen service_role
+  -- mag deze functie überhaupt uitvoeren.
+  if coalesce(current_setting('role', true), '') not in ('service_role', 'postgres')
+     and current_user not in ('service_role', 'postgres') then
     raise exception 'Niet geautoriseerd' using errcode = '42501';
   end if;
 

@@ -70,6 +70,20 @@ export async function saveApplication(
         error: 'Je hebt al een sollicitatie openstaan. Wacht even tot een Lead ernaar kijkt.',
       };
     }
+
+    // 42501 en 42883 wijzen op de installatie, niet op de bezoeker: de
+    // functie ontbreekt of de server draait niet als service_role. Dat is
+    // iets voor een Lead om recht te zetten, dus zeg dat er dan ook bij in
+    // plaats van "probeer het later opnieuw" — later werkt het namelijk ook
+    // niet.
+    if (error.code === '42501' || error.code === '42883') {
+      return {
+        ok: false,
+        error:
+          'De sollicitatie kon niet worden opgeslagen door een serverinstelling. Laat een Lead dit nakijken.',
+      };
+    }
+
     return { ok: false, error: 'Opslaan is niet gelukt. Probeer het later opnieuw.' };
   }
 
