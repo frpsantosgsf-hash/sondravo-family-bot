@@ -264,6 +264,7 @@ Alles staat met uitleg in `.env.example`. Kort samengevat:
 | `DISCORD_BOT_TOKEN` | — | **nee** | Discord-naam/avatar ophalen, aanwezigheid checken |
 | `DISCORD_GUILD_ID` | — | **nee** | Welke Discord-server gesynct wordt |
 | `DISCORD_ADMIN_ROLE_IDS` | — | **nee** | Rollen die automatisch beheerrechten geven |
+| `DISCORD_MEMBER_ROLE_ID` | — | **nee** | De familierol; bepaalt wie op de ledenlijst hoort |
 | `BOT_API_SECRET` | — | **nee** | Gedeeld geheim tussen bot en website |
 | `NEXT_PUBLIC_SITE_URL` | — | ja | Correcte OAuth-redirects en deelkaarten |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | — | ja | De intro-clip op de voorpagina |

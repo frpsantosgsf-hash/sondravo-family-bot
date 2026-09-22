@@ -152,6 +152,8 @@ export interface GuildMember {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+  /** De rol-ID's die dit lid in de server draagt. */
+  roleIds: string[];
 }
 
 /**
@@ -194,6 +196,7 @@ export async function fetchGuildMembers(): Promise<GuildMember[] | null> {
         displayName: payload.nick ?? user.global_name ?? user.username,
         username: user.username,
         avatarUrl: buildAvatarUrl(payload, config.guildId),
+        roleIds: payload.roles ?? [],
       });
     }
 
@@ -203,6 +206,36 @@ export async function fetchGuildMembers(): Promise<GuildMember[] | null> {
   }
 
   return leden;
+}
+
+/**
+ * Haalt de rollen van de server op als id -> naam.
+ *
+ * Nodig om te zien wélke rang iemand draagt: de rol-ID's op een lid zeggen
+ * niets, pas met de namen erbij weten we dat 1234… de rol "Zoky" is.
+ */
+export async function fetchGuildRoles(): Promise<Map<string, string> | null> {
+  const config = getDiscordSyncConfig();
+  if (!config) return null;
+
+  let response: Response;
+  try {
+    response = await fetch(`${DISCORD_API}/guilds/${config.guildId}/roles`, {
+      headers: { Authorization: `Bot ${config.botToken}` },
+      cache: 'no-store',
+    });
+  } catch {
+    return null;
+  }
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as { id?: string; name?: string }[];
+  const rollen = new Map<string, string>();
+  for (const rol of payload) {
+    if (rol.id && rol.name) rollen.set(rol.id, rol.name);
+  }
+  return rollen;
 }
 
 /**

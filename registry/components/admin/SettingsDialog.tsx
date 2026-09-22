@@ -18,6 +18,17 @@ interface MatchReport {
   overgeslagen?: string[];
 }
 
+/** Uitslag van de rol-import. */
+interface ImportReport {
+  metFamilierol?: number;
+  toegevoegd?: string[];
+  rangAangepast?: string[];
+  ongewijzigd?: number;
+  zonderRangrol?: string[];
+  zonderFamilierol?: string[];
+  mislukt?: string[];
+}
+
 function ReportList({ label, hint, names }: { label: string; hint: string; names: string[] }) {
   if (names.length === 0) return null;
   return (
@@ -53,6 +64,8 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
    * laatste leden met de hand te koppelen.
    */
   const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
 
   useEffect(() => {
     if (!state || state === handledRef.current) return;
@@ -65,6 +78,32 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
       toast(state.error, 'error');
     }
   }, [state, toast, onClose]);
+
+  /** Bouwt de ledenlijst op uit de Discord-rollen. */
+  async function runDiscordImport() {
+    setImporting(true);
+    setImportReport(null);
+    setMatchReport(null);
+    try {
+      const response = await fetch('/api/discord/import', { method: 'POST' });
+      const payload = (await response.json()) as ImportReport & { error?: string };
+
+      if (!response.ok) {
+        toast(payload.error ?? 'Importeren mislukt.', 'error');
+        return;
+      }
+
+      setImportReport(payload);
+      toast(
+        `${payload.metFamilierol ?? 0} leden met de familierol verwerkt.`,
+        payload.metFamilierol ? 'success' : 'info',
+      );
+    } catch {
+      toast('Importeren mislukt. Probeer het later opnieuw.', 'error');
+    } finally {
+      setImporting(false);
+    }
+  }
 
   /** Zoekt voor elk lid het Discord-account met dezelfde naam. */
   async function runDiscordMatch() {
@@ -166,9 +205,13 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
             Discord
           </h3>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
+            <strong className="text-ink/80">Uit rollen halen</strong> bouwt de lijst op uit je
+            Discord-server: iedereen met de familierol komt erop, en zijn rangrol bepaalt zijn
+            plek. Dit is de betrouwbaarste manier — er wordt niet op namen gegokt.
+          </p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
             <strong className="text-ink/80">Koppelen</strong> zoekt voor elk lid het Discord-account
-            met dezelfde naam, en zet daarna de foto en @naam automatisch op de lijst. Dat hoef je
-            maar één keer te doen.
+            met dezelfde naam. Alleen nodig voor leden die je met de hand hebt toegevoegd.
           </p>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
             <strong className="text-ink/80">Bijwerken</strong> haalt daarna nieuwe foto&apos;s en
@@ -180,9 +223,19 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
             type="button"
             variant="primary"
             size="sm"
+            onClick={runDiscordImport}
+            loading={importing}
+            disabled={matching || syncing}
+          >
+            Uit rollen halen
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
             onClick={runDiscordMatch}
             loading={matching}
-            disabled={syncing}
+            disabled={importing || syncing}
           >
             Koppelen aan Discord
           </Button>
@@ -192,11 +245,45 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
             size="sm"
             onClick={runDiscordSync}
             loading={syncing}
-            disabled={matching}
+            disabled={importing || matching}
           >
             Foto&apos;s bijwerken
           </Button>
         </div>
+
+        {importReport ? (
+          <div className="space-y-3 rounded-lg border border-line bg-panel-high p-3">
+            <p className="text-xs text-ink/80">
+              {importReport.metFamilierol ?? 0} leden met de familierol gevonden.{' '}
+              {importReport.ongewijzigd ?? 0} stonden al goed.
+            </p>
+            <ReportList
+              label="Toegevoegd"
+              hint="Deze stonden nog niet op de lijst en zijn er nu bij gezet."
+              names={importReport.toegevoegd ?? []}
+            />
+            <ReportList
+              label="Rang aangepast"
+              hint="De rangrol in Discord week af van de lijst. De Discord-rol wint."
+              names={importReport.rangAangepast ?? []}
+            />
+            <ReportList
+              label="Geen rangrol"
+              hint="Wel de familierol, maar geen rangrol. Deze staan nu op de laagste rang — geef ze een rangrol in Discord en draai dit nog eens."
+              names={importReport.zonderRangrol ?? []}
+            />
+            <ReportList
+              label="Familierol kwijt"
+              hint="Staan wel op de lijst, maar dragen de familierol niet meer. Er is niemand verwijderd — dat beslis jij."
+              names={importReport.zonderFamilierol ?? []}
+            />
+            <ReportList
+              label="Mislukt"
+              hint="Deze konden niet worden opgeslagen. Probeer het nog eens; blijft het misgaan, koppel ze dan met de hand."
+              names={importReport.mislukt ?? []}
+            />
+          </div>
+        ) : null}
 
         {matchReport ? (
           <div className="space-y-3 rounded-lg border border-line bg-panel-high p-3">

@@ -43,6 +43,16 @@ export function getAdminRoleIds(): string[] {
 }
 
 /**
+ * De Discord-rol die iedereen in de familie heeft. Wie die rol draagt hoort
+ * op de ledenlijst; wie hem niet heeft, hoort er niet bij. Leeg = de
+ * rol-import staat uit.
+ */
+export function getMemberRoleId(): string | null {
+  const id = String(process.env.DISCORD_MEMBER_ROLE_ID ?? '').trim();
+  return /^[0-9]{5,32}$/.test(id) ? id : null;
+}
+
+/**
  * Basis-URL van de site, gebruikt voor OAuth-redirects en metadata.
  * Vercel zet VERCEL_PROJECT_PRODUCTION_URL automatisch.
  */
