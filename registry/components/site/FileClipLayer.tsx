@@ -63,6 +63,13 @@ export function FileClipLayer({ src, poster, ref, onReady, onUnavailable }: File
       const video = videoRef.current;
       if (video) video.muted = muted;
     },
+    getDuration() {
+      // Zonder metadata is duration NaN of Infinity bij een stream.
+      const seconds = videoRef.current?.duration;
+      return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
+        ? seconds
+        : null;
+    },
   }));
 
   return (

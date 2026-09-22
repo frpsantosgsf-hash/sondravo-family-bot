@@ -8,6 +8,7 @@ interface YouTubePlayer {
   playVideo(): void;
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
+  getDuration(): number;
   mute(): void;
   unMute(): void;
   setVolume(volume: number): void;
@@ -111,6 +112,13 @@ export function YouTubeClipLayer({
         player.unMute();
         player.setVolume(70);
       }
+    },
+    getDuration() {
+      // YouTube geeft 0 terug zolang de video nog niet ingeladen is.
+      const seconds = playerRef.current?.getDuration();
+      return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
+        ? seconds
+        : null;
     },
   }));
 

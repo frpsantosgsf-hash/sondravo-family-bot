@@ -377,20 +377,28 @@ De voorpagina draait een lus: **logo → stukje clip → logo → stukje clip �
 
 ### Het tijdsverloop bijstellen
 
-Drie environment variables, allemaal in seconden:
+Vier environment variables:
 
 | Variable | Standaard | Wat het doet |
 |----------|-----------|--------------|
-| `NEXT_PUBLIC_HERO_LOGO_SECONDS` | `3.5` | Hoe lang het logo in beeld blijft |
-| `NEXT_PUBLIC_HERO_CLIP_SECONDS` | `10` | Hoe lang het fragment speelt |
-| `NEXT_PUBLIC_HERO_CLIP_START` | `0` | Op welke seconde in de clip dat fragment begint |
+| `NEXT_PUBLIC_HERO_LOGO_SECONDS` | `3.5` | Hoe lang het logo in beeld blijft, in seconden |
+| `NEXT_PUBLIC_HERO_CLIP_SECONDS` | `15` | Hoe lang het fragment speelt, in seconden |
+| `NEXT_PUBLIC_HERO_CLIP_FROM_END` | `true` | Rekent terug vanaf het eind van de clip |
+| `NEXT_PUBLIC_HERO_CLIP_START` | `0` | Beginseconde, alleen gebruikt als `FROM_END` uit staat |
 
-Wil je bijvoorbeeld het stuk vanaf 0:12 laten zien, 8 seconden lang, met het
-logo 4 seconden ertussen:
+Standaard speelt de intro dus de **laatste 15 seconden** van de clip. De
+speler leest de lengte van de video zelf uit en rekent terug, zodat die lengte
+nergens hard ingetypt staat — verwissel je de clip, dan klopt het nog steeds.
+Een halve seconde voor het eind stopt het fragment, zodat YouTube zijn
+eindscherm met suggesties er niet overheen legt.
+
+Wil je in plaats daarvan een vast stuk uit het midden, bijvoorbeeld vanaf 0:12
+en 8 seconden lang, met het logo 4 seconden ertussen:
 
 ```bash
 NEXT_PUBLIC_HERO_LOGO_SECONDS=4
 NEXT_PUBLIC_HERO_CLIP_SECONDS=8
+NEXT_PUBLIC_HERO_CLIP_FROM_END=false
 NEXT_PUBLIC_HERO_CLIP_START=12
 ```
 

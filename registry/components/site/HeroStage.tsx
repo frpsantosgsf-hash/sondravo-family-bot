@@ -73,6 +73,24 @@ function writePreference(enabled: boolean): void {
  * staan), het geluid staat standaard uit, en wie "verminderde beweging" in zijn
  * systeem heeft aanstaan krijgt de lus helemaal niet vanzelf te zien.
  */
+
+/**
+ * Bepaalt op welke seconde het fragment moet beginnen.
+ *
+ * Bij fromEnd rekenen we terug vanaf het eind van de clip, zodat de
+ * voorpagina de laatste seconden laat zien zonder dat de lengte van de video
+ * ergens hard ingetypt staat — verwisselt de clip, dan klopt het nog steeds.
+ * Zolang de speler die lengte nog niet weet, valt hij terug op startSeconds.
+ */
+function resolveClipStart(duration: number | null, timing: HeroTiming): number {
+  if (!timing.fromEnd || duration === null) return timing.startSeconds;
+
+  // Een halve seconde marge: zo loopt het fragment niet tot de allerlaatste
+  // frame, waar YouTube zijn eindscherm met suggesties overheen legt.
+  const fragment = timing.clipMs / 1000 + 0.5;
+  return Math.max(0, duration - fragment);
+}
+
 export function HeroStage({ source, timing, poster }: HeroStageProps) {
   const clipRef = useRef<ClipHandle | null>(null);
 
@@ -122,11 +140,11 @@ export function HeroStage({ source, timing, poster }: HeroStageProps) {
     if (!clip || !clipReady) return;
 
     if (active && phase === 'clip') {
-      clip.play(timing.startSeconds);
+      clip.play(resolveClipStart(clip.getDuration(), timing));
     } else {
       clip.pause();
     }
-  }, [active, phase, clipReady, timing.startSeconds]);
+  }, [active, phase, clipReady, timing]);
 
   const showingClip = active && phase === 'clip';
   const clipAvailable = clipReady && !clipBroken;

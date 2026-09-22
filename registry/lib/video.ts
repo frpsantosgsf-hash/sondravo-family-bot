@@ -15,12 +15,23 @@ export interface HeroTiming {
   clipMs: number;
   /** Op welke seconde in de clip het fragment begint. */
   startSeconds: number;
+  /**
+   * Meet het fragment vanaf het eind van de clip in plaats van vanaf
+   * startSeconds. Zo speelt de voorpagina de laatste seconden af zonder dat
+   * de lengte van de video ergens hard ingetypt staat.
+   */
+  fromEnd: boolean;
 }
 
 function readSeconds(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return parsed;
+}
+
+function readFlag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === '') return fallback;
+  return !['0', 'false', 'nee', 'off'].includes(value.trim().toLowerCase());
 }
 
 /**
@@ -31,8 +42,9 @@ function readSeconds(value: string | undefined, fallback: number): number {
 export function resolveHeroTiming(): HeroTiming {
   return {
     logoMs: readSeconds(process.env.NEXT_PUBLIC_HERO_LOGO_SECONDS, 3.5) * 1000,
-    clipMs: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_SECONDS, 10) * 1000,
+    clipMs: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_SECONDS, 15) * 1000,
     startSeconds: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_START, 0),
+    fromEnd: readFlag(process.env.NEXT_PUBLIC_HERO_CLIP_FROM_END, true),
   };
 }
 
