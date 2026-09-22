@@ -127,6 +127,37 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      applications: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          auth_user_id: string;
+          discord_user_id: string | null;
+          discord_username: string | null;
+          discord_display_name: string | null;
+          avatar_url: string | null;
+          name: string;
+          age: number | null;
+          phone: string | null;
+          motivation: string;
+          experience: string | null;
+          availability: string | null;
+          status: string;
+          handled_by: string | null;
+          handled_at: string | null;
+          admin_note: string | null;
+        };
+        // Insturen loopt via submit_application(); rechtstreeks inserten mag niet.
+        Insert: never;
+        Update: {
+          status?: string;
+          admin_note?: string | null;
+          handled_by?: string | null;
+          handled_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -167,6 +198,30 @@ export interface Database {
         Args: { p_discord_user_id: string; p_actor?: string };
         Returns: string | null;
       };
+      is_family_member: {
+        Args: Record<never, never>;
+        Returns: boolean;
+      };
+      submit_application: {
+        Args: {
+          p_auth_user_id: string;
+          p_name: string;
+          p_motivation: string;
+          p_discord_user_id?: string | null;
+          p_discord_username?: string | null;
+          p_discord_display_name?: string | null;
+          p_avatar_url?: string | null;
+          p_age?: number | null;
+          p_phone?: string | null;
+          p_experience?: string | null;
+          p_availability?: string | null;
+        };
+        Returns: string;
+      };
+      admin_set_application_status: {
+        Args: { p_id: string; p_status: string; p_note?: string | null };
+        Returns: Database['public']['Tables']['applications']['Row'];
+      };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
@@ -178,3 +233,4 @@ export type RankRow = Database['public']['Tables']['ranks']['Row'];
 export type SettingsRow = Database['public']['Tables']['settings']['Row'];
 export type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
 export type PrivateMemberRow = Database['public']['Tables']['private_member_data']['Row'];
+export type ApplicationRow = Database['public']['Tables']['applications']['Row'];

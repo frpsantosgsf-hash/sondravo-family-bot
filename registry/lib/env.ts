@@ -53,6 +53,27 @@ export function getMemberRoleId(): string | null {
 }
 
 /**
+ * De Discord-rol die toegang geeft tot het sollicitatieformulier. Wie die rol
+ * niet draagt, krijgt het formulier niet te zien. Leeg = solliciteren staat uit.
+ */
+export function getApplicantRoleId(): string | null {
+  const id = String(process.env.DISCORD_APPLICANT_ROLE_ID ?? '').trim();
+  return /^[0-9]{5,32}$/.test(id) ? id : null;
+}
+
+/**
+ * Discord-webhook waar een nieuwe sollicitatie gemeld wordt. Leeg = geen
+ * melding in Discord; de sollicitatie komt dan alleen op de site binnen.
+ */
+export function getApplicationWebhookUrl(): string | null {
+  const url = String(process.env.DISCORD_APPLICATION_WEBHOOK_URL ?? '').trim();
+  return url.startsWith('https://discord.com/api/webhooks/') ||
+    url.startsWith('https://discordapp.com/api/webhooks/')
+    ? url
+    : null;
+}
+
+/**
  * Basis-URL van de site, gebruikt voor OAuth-redirects en metadata.
  * Vercel zet VERCEL_PROJECT_PRODUCTION_URL automatisch.
  */

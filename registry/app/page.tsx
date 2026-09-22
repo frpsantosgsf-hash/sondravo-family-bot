@@ -4,6 +4,7 @@ import { SiteFooter } from '@/components/site/SiteFooter';
 import { HeroStage } from '@/components/site/HeroStage';
 import { CapacityMeter } from '@/components/site/CapacityMeter';
 import { getRegistryData } from '@/lib/data';
+import { getViewerAccess, mayViewRegistry } from '@/lib/access';
 import { resolveHeroTiming, resolveHeroVideo } from '@/lib/video';
 
 export const dynamic = 'force-dynamic';
@@ -13,16 +14,20 @@ const HERO_VIDEO_SRC =
   process.env.NEXT_PUBLIC_HERO_VIDEO_URL || 'https://www.youtube.com/watch?v=Yeo4TWyC1wo';
 
 export default async function HomePage() {
-  const { members, ranks, settings, viewer, configError } = await getRegistryData();
+  const [access, registry] = await Promise.all([getViewerAccess(), getRegistryData()]);
+  const { members, ranks, settings, viewer, configError } = registry;
   const source = resolveHeroVideo(HERO_VIDEO_SRC);
   const timing = resolveHeroTiming();
 
+  // De lijst is besloten, dus de tellers ook: voor een buitenstaander komt er
+  // toch niets uit de database en dan staat er alleen maar een hoop nul.
+  const toonCijfers = mayViewRegistry(access);
   const total = members.length;
   const occupiedRanks = new Set(members.map((member) => member.rank)).size;
 
   return (
     <>
-      <SiteNav viewer={viewer} current="/" />
+      <SiteNav viewer={viewer} current="/" showRegistry={toonCijfers} />
 
       <main id="hoofdinhoud">
         {/* ---------------------------------------------------------------- */}
@@ -49,7 +54,9 @@ export default async function HomePage() {
               className="animate-fade-up mt-3 max-w-md text-[15px] leading-relaxed text-pretty text-muted"
               style={{ animationDelay: '0.8s' }}
             >
-              Eén familie, één lijst. In de ledenlijst zie je iedereen netjes op rang.
+              {toonCijfers
+                ? 'Eén familie, één lijst. In de ledenlijst zie je iedereen netjes op rang.'
+                : 'Eén familie, één lijst. De ledenlijst is besloten — denk je dat je erbij hoort, solliciteer dan.'}
             </p>
 
             <div
@@ -57,10 +64,10 @@ export default async function HomePage() {
               style={{ animationDelay: '0.9s' }}
             >
               <Link
-                href="/leden"
+                href={toonCijfers ? '/leden' : '/solliciteren'}
                 className="tap-target inline-flex w-full items-center justify-center gap-2 rounded-lg bg-creme px-6 text-sm font-semibold uppercase tracking-[0.14em] text-void shadow-[0_14px_40px_-18px_rgba(241,232,207,0.7)] transition-all duration-150 hover:bg-white sm:w-auto"
               >
-                Ledenlijst bekijken
+                {toonCijfers ? 'Ledenlijst bekijken' : 'Solliciteren'}
                 <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 10h11m0 0l-4-4m4 4l-4 4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -82,16 +89,21 @@ export default async function HomePage() {
               ) : null}
             </div>
 
-            <div className="animate-fade-up mt-9 flex justify-center" style={{ animationDelay: '1s' }}>
-              <CapacityMeter total={total} limit={settings.memberLimit} variant="hero" />
-            </div>
+            {toonCijfers ? (
+              <div className="animate-fade-up mt-9 flex justify-center" style={{ animationDelay: '1s' }}>
+                <CapacityMeter total={total} limit={settings.memberLimit} variant="hero" />
+              </div>
+            ) : null}
           </div>
         </section>
 
         {/* ---------------------------------------------------------------- */}
         {/* Cijfers                                                           */}
         {/* ---------------------------------------------------------------- */}
-        <section aria-label="De familie in cijfers" className="mx-auto mt-4 max-w-4xl px-4 sm:px-6">
+        <section
+          aria-label="De familie in cijfers"
+          className={`mx-auto mt-4 max-w-4xl px-4 sm:px-6 ${toonCijfers ? '' : 'hidden'}`}
+        >
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Leden" value={configError ? '—' : String(total)} />
             <Stat label="Capaciteit" value={String(settings.memberLimit)} />

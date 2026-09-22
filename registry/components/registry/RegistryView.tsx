@@ -11,6 +11,7 @@ import { MemberDialog } from '@/components/admin/MemberDialog';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { HistoryDialog } from '@/components/admin/HistoryDialog';
 import { SettingsDialog } from '@/components/admin/SettingsDialog';
+import { ApplicationsDialog } from '@/components/admin/ApplicationsDialog';
 import { changeRankAction, deleteMemberAction } from '@/lib/actions';
 import { DEFAULT_RANK_KEY } from '@/lib/ranks';
 import type { FamilySettings, Rank, RankGroup, RegistryMember, Viewer } from '@/types';
@@ -27,7 +28,8 @@ type DialogState =
   | { type: 'member'; member: RegistryMember | null }
   | { type: 'delete'; member: RegistryMember }
   | { type: 'history' }
-  | { type: 'settings' };
+  | { type: 'settings' }
+  | { type: 'applications' };
 
 /** Maakt zoeken diakriet- en hoofdletterongevoelig. */
 function normalize(value: string): string {
@@ -135,6 +137,13 @@ export function RegistryView({ members, ranks, settings, viewer }: RegistryViewP
           >
             <span aria-hidden>+</span> Lid toevoegen
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setDialog({ type: 'applications' })}
+          >
+            Sollicitaties
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setDialog({ type: 'history' })}>
             History
           </Button>
@@ -238,6 +247,10 @@ export function RegistryView({ members, ranks, settings, viewer }: RegistryViewP
 
       {isAdmin && dialog.type === 'history' ? (
         <HistoryDialog open ranks={ranks} onClose={closeDialog} />
+      ) : null}
+
+      {isAdmin && dialog.type === 'applications' ? (
+        <ApplicationsDialog open onClose={closeDialog} />
       ) : null}
 
       {isAdmin && dialog.type === 'settings' ? (

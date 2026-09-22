@@ -12,6 +12,8 @@ export interface DiscordProfile {
   /** De @handle. */
   username: string | null;
   avatarUrl: string | null;
+  /** De rol-ID's die dit account in de server draagt. */
+  roleIds: string[];
 }
 
 interface DiscordUserPayload {
@@ -68,7 +70,7 @@ export async function fetchDiscordProfile(discordUserId: string): Promise<Discor
   );
 
   if (response.status === 404) {
-    return { inGuild: false, displayName: null, username: null, avatarUrl: null };
+    return { inGuild: false, displayName: null, username: null, avatarUrl: null, roleIds: [] };
   }
 
   if (!response.ok) {
@@ -83,6 +85,7 @@ export async function fetchDiscordProfile(discordUserId: string): Promise<Discor
     displayName: payload.nick ?? payload.user?.global_name ?? payload.user?.username ?? null,
     username: payload.user?.username ?? null,
     avatarUrl: buildAvatarUrl(payload, config.guildId),
+    roleIds: payload.roles ?? [],
   };
 }
 
