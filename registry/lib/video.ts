@@ -4,8 +4,37 @@
  */
 
 export type HeroVideo =
-  | { kind: 'youtube'; id: string; embedUrl: string; thumbnailUrl: string }
+  | { kind: 'youtube'; id: string; embedUrl: string; watchUrl: string; thumbnailUrl: string }
   | { kind: 'file'; src: string };
+
+/** Timing van de intro-lus op de voorpagina. */
+export interface HeroTiming {
+  /** Hoe lang het logo in beeld blijft, in milliseconden. */
+  logoMs: number;
+  /** Hoe lang het fragment uit de clip speelt, in milliseconden. */
+  clipMs: number;
+  /** Op welke seconde in de clip het fragment begint. */
+  startSeconds: number;
+}
+
+function readSeconds(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
+/**
+ * De lus: logo in beeld, dan een kort fragment uit de clip, dan weer het logo.
+ * Alle drie de waarden zijn met environment variables aan te passen zonder
+ * dat er code in hoeft.
+ */
+export function resolveHeroTiming(): HeroTiming {
+  return {
+    logoMs: readSeconds(process.env.NEXT_PUBLIC_HERO_LOGO_SECONDS, 3.5) * 1000,
+    clipMs: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_SECONDS, 10) * 1000,
+    startSeconds: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_START, 0),
+  };
+}
 
 const YOUTUBE_HOSTS = new Set([
   'youtube.com',
@@ -53,21 +82,12 @@ export function resolveHeroVideo(value: string): HeroVideo {
   const id = extractYouTubeId(value.trim());
 
   if (id) {
-    const params = new URLSearchParams({
-      autoplay: '1',
-      mute: '1',
-      loop: '1',
-      playlist: id, // loop werkt alleen met een playlist van zichzelf
-      rel: '0',
-      modestbranding: '1',
-      playsinline: '1',
-    });
-
     return {
       kind: 'youtube',
       id,
       // nocookie-domein: geen tracking-cookies voordat iemand echt kijkt.
-      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
+      watchUrl: `https://www.youtube.com/watch?v=${id}`,
       thumbnailUrl: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
     };
   }

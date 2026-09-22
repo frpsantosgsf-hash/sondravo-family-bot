@@ -28,8 +28,11 @@ iets wijzigen.
 ## Wat de site doet
 
 ### Voorpagina (`/`)
-- Logo dat rustig in beeld komt
-- Onze intro-clip (YouTube of een eigen bestand)
+- Een intro-lus: het logo komt rustig in beeld en blijft ±3,5 seconde staan,
+  daarna vloeit er ±10 seconden uit onze clip in met een donkere rand eromheen,
+  en dan is het logo er weer — dat blijft zo doorgaan
+- Te pauzeren met één knop (het logo blijft dan staan) en die keuze wordt
+  onthouden; geluid staat standaard uit
 - Live ledenteller met capaciteitsbalk
 - Knop naar de ledenlijst
 
@@ -302,10 +305,33 @@ met de naam van degene die het commando gaf.
 
 ---
 
-## De intro-clip vervangen
+## De intro aanpassen
 
-De voorpagina toont standaard onze intro van YouTube. Twee manieren om dat te
-veranderen:
+De voorpagina draait een lus: **logo → stukje clip → logo → stukje clip → ...**
+
+### Het tijdsverloop bijstellen
+
+Drie environment variables, allemaal in seconden:
+
+| Variable | Standaard | Wat het doet |
+|----------|-----------|--------------|
+| `NEXT_PUBLIC_HERO_LOGO_SECONDS` | `3.5` | Hoe lang het logo in beeld blijft |
+| `NEXT_PUBLIC_HERO_CLIP_SECONDS` | `10` | Hoe lang het fragment speelt |
+| `NEXT_PUBLIC_HERO_CLIP_START` | `0` | Op welke seconde in de clip dat fragment begint |
+
+Wil je bijvoorbeeld het stuk vanaf 0:12 laten zien, 8 seconden lang, met het
+logo 4 seconden ertussen:
+
+```bash
+NEXT_PUBLIC_HERO_LOGO_SECONDS=4
+NEXT_PUBLIC_HERO_CLIP_SECONDS=8
+NEXT_PUBLIC_HERO_CLIP_START=12
+```
+
+> Let op: dit zijn `NEXT_PUBLIC_`-waarden. Die worden bij het bouwen vastgelegd,
+> dus na een wijziging in Vercel moet je opnieuw deployen.
+
+### Een andere clip gebruiken
 
 **Andere YouTube-link:** zet `NEXT_PUBLIC_HERO_VIDEO_URL` op de nieuwe link.
 `watch?v=`, `youtu.be/` en `/shorts/` werken allemaal.
@@ -314,8 +340,17 @@ veranderen:
 `NEXT_PUBLIC_HERO_VIDEO_URL=/media/sondravo.mp4`. Houd het bestand klein
 (< 10 MB) — anders duurt het laden te lang op mobiel.
 
-De clip start gedempt zodra hij in beeld komt. Wie "verminderde beweging" aan
-heeft staan, krijgt een stilstaande plaat met een afspeelknop.
+### Hoe bezoekers de controle houden
+
+- **Intro pauzeren** — één knop stopt de lus en brengt het logo terug. De knop
+  wordt dan **Intro afspelen**.
+- Die keuze wordt onthouden, dus wie de intro uitzet houdt hem uit bij een
+  volgend bezoek.
+- **Geluid** staat altijd uit bij het starten en is per knop aan te zetten.
+- Staat "verminderde beweging" aan in het systeem van de bezoeker, dan draait de
+  lus niet vanzelf — dan blijft het logo staan tot iemand zelf op afspelen drukt.
+- Laadt de clip niet (geen internet, bestand weg), dan blijft simpelweg het logo
+  staan. Er verschijnt nooit een kapotte speler.
 
 ---
 

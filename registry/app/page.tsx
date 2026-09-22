@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { SiteNav } from '@/components/site/SiteNav';
 import { SiteFooter } from '@/components/site/SiteFooter';
-import { Wordmark } from '@/components/site/Wordmark';
-import { HeroVideo } from '@/components/site/HeroVideo';
+import { HeroStage } from '@/components/site/HeroStage';
 import { CapacityMeter } from '@/components/site/CapacityMeter';
 import { getRegistryData } from '@/lib/data';
-import { resolveHeroVideo } from '@/lib/video';
+import { resolveHeroTiming, resolveHeroVideo } from '@/lib/video';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +14,8 @@ const HERO_VIDEO_SRC =
 
 export default async function HomePage() {
   const { members, ranks, settings, viewer, configError } = await getRegistryData();
+  const source = resolveHeroVideo(HERO_VIDEO_SRC);
+  const timing = resolveHeroTiming();
 
   const total = members.length;
   const occupiedRanks = new Set(members.map((member) => member.rank)).size;
@@ -25,13 +26,12 @@ export default async function HomePage() {
 
       <main id="hoofdinhoud">
         {/* ---------------------------------------------------------------- */}
-        {/* Hero — het logo komt rustig in beeld, daarna de rest              */}
+        {/* Intro: logo, dan een stukje van onze clip, dan weer het logo      */}
         {/* ---------------------------------------------------------------- */}
-        <section className="relative overflow-hidden px-4 pb-12 pt-12 sm:px-6 sm:pb-16 sm:pt-20">
-          {/* Zachte gloed achter het logo, nooit hard genoeg om op te vallen */}
+        <section className="relative overflow-hidden px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-12">
           <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-0 h-[26rem] w-[40rem] max-w-none -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(241,232,207,0.09),transparent)] blur-2xl"
+            className="pointer-events-none absolute left-1/2 top-0 h-[26rem] w-[40rem] max-w-none -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(241,232,207,0.07),transparent)] blur-2xl"
           />
 
           <div className="relative mx-auto flex max-w-3xl flex-col items-center text-center">
@@ -39,28 +39,22 @@ export default async function HomePage() {
                 en zoekmachines, maar wordt niet dubbel getoond. */}
             <h1 className="sr-only">The Sondravo Family — Official Family Registry</h1>
 
-            <div className="animate-mark-in w-full">
-              <Wordmark variant="stacked" priority className="mx-auto" />
-            </div>
+            <HeroStage source={source} timing={timing} poster="/media/poster.png" />
 
-            <p
-              className="eyebrow animate-fade-up mt-8"
-              style={{ animationDelay: '0.75s' }}
-            >
+            <p className="eyebrow animate-fade-up mt-8" style={{ animationDelay: '0.7s' }}>
               Official Family Registry
             </p>
 
             <p
-              className="animate-fade-up mt-4 max-w-md text-[15px] leading-relaxed text-pretty text-muted"
-              style={{ animationDelay: '0.85s' }}
+              className="animate-fade-up mt-3 max-w-md text-[15px] leading-relaxed text-pretty text-muted"
+              style={{ animationDelay: '0.8s' }}
             >
-              Eén familie, één lijst. Bekijk onze intro hieronder — en in de ledenlijst
-              zie je iedereen netjes op rang.
+              Eén familie, één lijst. In de ledenlijst zie je iedereen netjes op rang.
             </p>
 
             <div
-              className="animate-fade-up mt-8 flex flex-col items-center gap-4 sm:flex-row"
-              style={{ animationDelay: '1.05s' }}
+              className="animate-fade-up mt-7 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row"
+              style={{ animationDelay: '0.9s' }}
             >
               <Link
                 href="/leden"
@@ -72,45 +66,32 @@ export default async function HomePage() {
                 </svg>
               </Link>
 
-              <a
-                href="#clip"
-                className="tap-target inline-flex w-full items-center justify-center rounded-lg border border-line bg-panel-high px-6 text-sm uppercase tracking-[0.14em] text-ink transition-all duration-150 hover:border-creme/25 hover:bg-panel-hover sm:w-auto"
-              >
-                Onze clip
-              </a>
+              {source.kind === 'youtube' ? (
+                <a
+                  href={source.watchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tap-target inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-panel-high px-6 text-sm uppercase tracking-[0.14em] text-ink transition-all duration-150 hover:border-creme/25 hover:bg-panel-hover sm:w-auto"
+                >
+                  Hele intro
+                  <svg viewBox="0 0 20 20" aria-hidden className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M7 4h9v9M16 4L6 14M4 8v8h8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="sr-only">(opent op YouTube)</span>
+                </a>
+              ) : null}
             </div>
 
-            <div
-              className="animate-fade-up mt-10 flex justify-center"
-              style={{ animationDelay: '1.15s' }}
-            >
+            <div className="animate-fade-up mt-9 flex justify-center" style={{ animationDelay: '1s' }}>
               <CapacityMeter total={total} limit={settings.memberLimit} variant="hero" />
             </div>
           </div>
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* De clip                                                           */}
-        {/* ---------------------------------------------------------------- */}
-        <section
-          id="clip"
-          aria-labelledby="clip-titel"
-          className="animate-fade-up mx-auto max-w-4xl scroll-mt-20 px-4 sm:px-6"
-          style={{ animationDelay: '1.25s' }}
-        >
-          <div className="mb-4 flex items-center gap-3">
-            <h2 id="clip-titel" className="eyebrow">
-              Onze intro
-            </h2>
-            <div className="hairline flex-1" />
-          </div>
-          <HeroVideo source={resolveHeroVideo(HERO_VIDEO_SRC)} poster="/media/poster.png" />
-        </section>
-
-        {/* ---------------------------------------------------------------- */}
         {/* Cijfers                                                           */}
         {/* ---------------------------------------------------------------- */}
-        <section aria-label="De familie in cijfers" className="mx-auto mt-12 max-w-4xl px-4 sm:px-6">
+        <section aria-label="De familie in cijfers" className="mx-auto mt-4 max-w-4xl px-4 sm:px-6">
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Leden" value={configError ? '—' : String(total)} />
             <Stat label="Capaciteit" value={String(settings.memberLimit)} />
