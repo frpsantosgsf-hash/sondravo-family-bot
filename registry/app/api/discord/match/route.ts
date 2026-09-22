@@ -7,6 +7,50 @@ import { fetchGuildMembers, isDiscordSyncEnabled, normalizeName } from '@/lib/di
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** Onder deze lengte zoeken we niet op gelijkenis: te veel toevalstreffers. */
+const MIN_LENGTE_VOOR_GELIJKENIS = 3;
+
+interface Kandidaat {
+  discordUserId: string;
+  username: string;
+  avatarUrl: string | null;
+  /** Naam en bijnaam, allebei kaalgemaakt met normalizeName. */
+  namen: string[];
+}
+
+/**
+ * Zoekt de Discord-accounts die bij een naam horen, in drie rondes die steeds
+ * losser worden. Er wordt pas naar de volgende ronde gekeken als de vorige
+ * niets oplevert, zodat een exacte naam het altijd wint van een gelijkende.
+ */
+function zoekKandidaten(naam: string, kandidaten: Kandidaat[]): {
+  treffers: Kandidaat[];
+  exact: boolean;
+} {
+  const exact = kandidaten.filter((k) => k.namen.includes(naam));
+  if (exact.length > 0) return { treffers: exact, exact: true };
+
+  if (naam.length < MIN_LENGTE_VOOR_GELIJKENIS) return { treffers: [], exact: false };
+
+  // "Ryan" vindt "RyanSondravo", en "SDF Ryan" vindt "Ryan".
+  const begint = kandidaten.filter((k) =>
+    k.namen.some(
+      (n) =>
+        n.length >= MIN_LENGTE_VOOR_GELIJKENIS &&
+        (n.startsWith(naam) || naam.startsWith(n)),
+    ),
+  );
+  if (begint.length > 0) return { treffers: begint, exact: false };
+
+  // Laatste ronde: de naam zit ergens middenin, zoals "xXDaveXx".
+  const bevat = kandidaten.filter((k) =>
+    k.namen.some(
+      (n) => n.length >= MIN_LENGTE_VOOR_GELIJKENIS && (n.includes(naam) || naam.includes(n)),
+    ),
+  );
+  return { treffers: bevat, exact: false };
+}
+
 /**
  * Koppelt de ledenlijst in één keer aan de Discord-server.
  *
@@ -16,7 +60,9 @@ export const dynamic = 'force-dynamic';
  *
  * Koppelt alleen bij een ondubbelzinnige match: levert een naam meer dan één
  * Discord-account op, dan blijft dat lid met rust. Liever een lid dat je zelf
- * moet koppelen dan een verkeerd gezicht op de lijst.
+ * moet koppelen dan een verkeerd gezicht op de lijst. Leden die alleen op
+ * gelijkenis zijn gevonden worden apart teruggemeld, zodat je die even kunt
+ * nalopen.
  */
 export async function POST() {
   const gate = await requireAdmin();
@@ -46,28 +92,24 @@ export async function POST() {
     return NextResponse.json({ error: 'Kon de ledenlijst niet ophalen.' }, { status: 500 });
   }
 
-  // Een naam die bij meerdere Discord-accounts hoort, is geen match.
-  const opNaam = new Map<string, typeof guildLeden>();
-  for (const lid of guildLeden) {
-    for (const naam of new Set([normalizeName(lid.displayName), normalizeName(lid.username)])) {
-      if (!naam) continue;
-      const bestaand = opNaam.get(naam);
-      if (bestaand) {
-        bestaand.push(lid);
-      } else {
-        opNaam.set(naam, [lid]);
-      }
-    }
-  }
+  const kandidaten: Kandidaat[] = guildLeden.map((lid) => ({
+    discordUserId: lid.discordUserId,
+    username: lid.username,
+    avatarUrl: lid.avatarUrl,
+    namen: [...new Set([normalizeName(lid.displayName), normalizeName(lid.username)])].filter(
+      Boolean,
+    ),
+  }));
 
   const gekoppeld: string[] = [];
+  const viaGelijkenis: string[] = [];
   const nietGevonden: string[] = [];
   const meerdereOpties: string[] = [];
 
   for (const lid of leden) {
-    const treffers = opNaam.get(normalizeName(lid.name));
+    const { treffers, exact } = zoekKandidaten(normalizeName(lid.name), kandidaten);
 
-    if (!treffers || treffers.length === 0) {
+    if (treffers.length === 0) {
       nietGevonden.push(lid.name);
       continue;
     }
@@ -106,6 +148,7 @@ export async function POST() {
     }
 
     gekoppeld.push(lid.name);
+    if (!exact) viaGelijkenis.push(`${lid.name} -> @${match.username}`);
   }
 
   revalidatePath('/');
@@ -114,6 +157,7 @@ export async function POST() {
   return NextResponse.json({
     gekoppeld: gekoppeld.length,
     namen: gekoppeld,
+    viaGelijkenis,
     nietGevonden,
     meerdereOpties,
     discordLeden: guildLeden.length,

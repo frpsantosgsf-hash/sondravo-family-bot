@@ -8,6 +8,28 @@ import { useToast } from '@/components/ui/Toast';
 import { saveSettingsAction } from '@/lib/actions';
 import type { ActionResult, FamilySettings } from '@/types';
 
+/** Wat het koppelen heeft gedaan, en wat er nog handwerk is. */
+interface MatchReport {
+  gekoppeld?: number;
+  discordLeden?: number;
+  viaGelijkenis?: string[];
+  nietGevonden?: string[];
+  meerdereOpties?: string[];
+}
+
+function ReportList({ label, hint, names }: { label: string; hint: string; names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+        {label} ({names.length})
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-soft">{hint}</p>
+      <p className="mt-1 text-xs leading-relaxed text-ink/75">{names.join(' · ')}</p>
+    </div>
+  );
+}
+
 interface SettingsDialogProps {
   open: boolean;
   settings: FamilySettings;
@@ -24,6 +46,12 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
   const handledRef = useRef<ActionResult | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [matching, setMatching] = useState(false);
+  /**
+   * De uitslag van het koppelen blijft in beeld staan. Een toast glijdt weg
+   * voordat je de namen gelezen hebt, en juist die namen heb je nodig om de
+   * laatste leden met de hand te koppelen.
+   */
+  const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
 
   useEffect(() => {
     if (!state || state === handledRef.current) return;
@@ -40,30 +68,19 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
   /** Zoekt voor elk lid het Discord-account met dezelfde naam. */
   async function runDiscordMatch() {
     setMatching(true);
+    setMatchReport(null);
     try {
       const response = await fetch('/api/discord/match', { method: 'POST' });
-      const payload = (await response.json()) as {
-        error?: string;
-        gekoppeld?: number;
-        nietGevonden?: string[];
-        meerdereOpties?: string[];
-      };
+      const payload = (await response.json()) as MatchReport & { error?: string };
 
       if (!response.ok) {
         toast(payload.error ?? 'Koppelen mislukt.', 'error');
         return;
       }
 
-      const rest: string[] = [];
-      if (payload.nietGevonden?.length) {
-        rest.push(`niet gevonden: ${payload.nietGevonden.join(', ')}`);
-      }
-      if (payload.meerdereOpties?.length) {
-        rest.push(`meerdere opties: ${payload.meerdereOpties.join(', ')}`);
-      }
-
+      setMatchReport(payload);
       toast(
-        `${payload.gekoppeld ?? 0} leden gekoppeld.${rest.length ? ` Nog te doen — ${rest.join('; ')}.` : ''}`,
+        `${payload.gekoppeld ?? 0} leden gekoppeld van de ${payload.discordLeden ?? 0} in je Discord-server.`,
         payload.gekoppeld ? 'success' : 'info',
       );
     } catch {
@@ -179,6 +196,30 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
             Foto&apos;s bijwerken
           </Button>
         </div>
+
+        {matchReport ? (
+          <div className="space-y-3 rounded-lg border border-line bg-panel-high p-3">
+            <p className="text-xs text-ink/80">
+              {matchReport.gekoppeld ?? 0} leden gekoppeld, uit {matchReport.discordLeden ?? 0}{' '}
+              accounts in je Discord-server.
+            </p>
+            <ReportList
+              label="Op gelijkenis gekoppeld"
+              hint="De naam kwam niet exact overeen. Even nalopen of dit klopt."
+              names={matchReport.viaGelijkenis ?? []}
+            />
+            <ReportList
+              label="Niet gevonden"
+              hint="Geen account met deze naam in de server. Pas de bijnaam in Discord aan, of vul het Discord user ID met de hand in via het potloodje."
+              names={matchReport.nietGevonden ?? []}
+            />
+            <ReportList
+              label="Meerdere opties"
+              hint="Meer dan één account past bij deze naam, dus deze zijn met rust gelaten. Handmatig koppelen via het potloodje."
+              names={matchReport.meerdereOpties ?? []}
+            />
+          </div>
+        ) : null}
       </div>
     </Modal>
   );
