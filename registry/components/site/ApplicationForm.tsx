@@ -69,9 +69,10 @@ export function ApplicationForm() {
       <TextField
         label="Ingame telefoonnummer"
         name="phone"
+        required
         maxLength={32}
         inputMode="tel"
-        hint="Je nummer in de stad — daar bellen we je op. Zonder nummer kunnen we je ingame niet bereiken."
+        hint="Je nummer in de stad — daar bellen we je op. Dit moet kloppen, anders kunnen we je niet bereiken."
         defaultValue={values?.phone ?? ''}
         error={errors['phone']}
       />

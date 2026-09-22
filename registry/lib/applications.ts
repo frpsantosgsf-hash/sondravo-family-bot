@@ -18,7 +18,22 @@ export const applicationSchema = z.object({
     .refine((value) => value === null || (Number.isInteger(value) && value >= 10 && value <= 99), {
       message: 'Vul een leeftijd tussen 10 en 99 in.',
     }),
-  phone: z.string().trim().max(32, 'Telefoonnummer is te lang.').optional(),
+  /*
+   * Verplicht: zonder nummer is iemand ingame niet te bereiken, en dat is de
+   * enige manier waarop de familie contact opneemt.
+   *
+   * De controle is bewust ruim. Spaties, streepjes en haakjes worden genegeerd
+   * omdat mensen hun nummer nu eenmaal op allerlei manieren opschrijven; wat
+   * overblijft moet een rij cijfers zijn van een geloofwaardige lengte.
+   */
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'Vul je ingame telefoonnummer in.')
+    .max(32, 'Telefoonnummer is te lang.')
+    .refine((waarde) => /^[0-9]{6,15}$/.test(waarde.replace(/[\s\-().+]/g, '')), {
+      message: 'Dit lijkt geen telefoonnummer. Bijvoorbeeld: 0612345678',
+    }),
   motivation: z
     .string()
     .trim()
