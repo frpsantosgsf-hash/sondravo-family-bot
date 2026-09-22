@@ -67,17 +67,17 @@ export function AuthControls({
             {viewer.name.slice(0, 1).toUpperCase()}
           </span>
         )}
-        <span className="flex min-w-0 flex-col leading-tight">
+        <span className="flex min-w-0 max-w-[9rem] flex-col leading-tight sm:max-w-none">
           <span className="truncate text-[13px] text-ink">
             <span className="hidden sm:inline">Ingelogd als </span>
             {viewer.name}
           </span>
           <span
-            className={`text-[10px] uppercase tracking-[0.18em] ${
+            className={`truncate whitespace-nowrap text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.18em] ${
               viewer.isAdmin ? 'text-creme/80' : 'text-muted-soft'
             }`}
           >
-            {viewer.isAdmin ? 'Lead · Admin' : 'Geen beheerrechten'}
+            {viewer.isAdmin ? 'Lead · Admin' : 'Geen rechten'}
           </span>
         </span>
       </div>

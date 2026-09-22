@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, relativeTime } from '@/lib/format';
 import type { ApplicationRow } from '@/types/database';
 
 /** De stand van de stemming bij één sollicitatie. */
@@ -175,151 +175,214 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
 
   return (
     <ul className={compact ? 'space-y-3' : 'space-y-4'}>
-      {rows.map((row) => {
-        const stand = votes[row.id] ?? { ja: 0, nee: 0, mine: null };
-        const status = STATUS[row.status] ?? STATUS['nieuw']!;
-        const bezig = busy === row.id;
-
-        return (
-          <li
-            key={row.id}
-            className="relative overflow-hidden rounded-xl border border-line bg-panel"
-          >
-            {/* Het streepje links draagt de statuskleur over de hele kaart. */}
-            <span
-              aria-hidden
-              className={`absolute inset-y-0 left-0 w-1 ${status.rand}`}
-            />
-
-            {/* ---------- Kop ---------- */}
-            <div
-              className={`flex items-start gap-3.5 border-b border-line-soft px-4 py-3.5 pl-5 sm:px-5 sm:pl-6 ${status.vlak}`}
-            >
-              {row.avatar_url ? (
-                <Image
-                  src={row.avatar_url}
-                  alt=""
-                  width={44}
-                  height={44}
-                  className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-line"
-                />
-              ) : (
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-panel-hover text-xs font-medium text-muted ring-1 ring-line">
-                  {row.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <p className="font-display text-base tracking-wide text-creme">{row.name}</p>
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${status.pil}`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${status.stip}`} aria-hidden />
-                    {status.label}
-                  </span>
-                </div>
-
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  {[
-                    row.discord_username ? `@${row.discord_username}` : null,
-                    row.age ? `${row.age} jaar` : null,
-                    row.phone,
-                    formatDateTime(row.created_at),
-                  ]
-                    .filter(Boolean)
-                    .join('  ·  ')}
-                </p>
-              </div>
-
-              {/* Stand van de stemming, altijd rechtsboven zichtbaar. */}
-              <div className="flex shrink-0 items-center gap-2 pt-0.5">
-                <Teller icoon="check" aantal={stand.ja} toon="groen" />
-                <Teller icoon="cross" aantal={stand.nee} toon="rood" />
-              </div>
-            </div>
-
-            {/* ---------- Inhoud ---------- */}
-            <div className="space-y-3.5 px-4 py-4 pl-5 sm:px-5 sm:pl-6">
-              <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
-              <Veld label="Ervaring in FiveM" waarde={row.experience} />
-              <Veld label="Wanneer online" waarde={row.availability} />
-            </div>
-
-            {/* ---------- Stemmen ---------- */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3 pl-5 sm:px-5 sm:pl-6">
-              <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
-                Jouw stem
-              </span>
-
-              <StemKnop
-                actief={stand.mine === 'ja'}
-                toon="groen"
-                disabled={bezig}
-                onClick={() => stem(row.id, 'ja')}
-                label="Voor"
-              />
-              <StemKnop
-                actief={stand.mine === 'nee'}
-                toon="rood"
-                disabled={bezig}
-                onClick={() => stem(row.id, 'nee')}
-                label="Tegen"
-              />
-
-              {stand.mine ? (
-                <span className="text-[11px] text-muted-soft">
-                  Nog een keer klikken trekt je stem in.
-                </span>
-              ) : null}
-            </div>
-
-            {/* ---------- Beslissen (alleen Lead) ---------- */}
-            {isAdmin ? (
-              <div className="border-t border-line-soft bg-panel-high px-4 py-3 pl-5 sm:px-5 sm:pl-6">
-                {row.handled_by ? (
-                  <p className="mb-2.5 text-[11px] text-muted-soft">
-                    Laatst behandeld door {row.handled_by}
-                    {row.handled_at ? ` op ${formatDateTime(row.handled_at)}` : ''}.
-                  </p>
-                ) : null}
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primary"
-                    loading={bezig}
-                    disabled={busy !== null || row.status === 'aangenomen'}
-                    onClick={() => zetStatus(row.id, 'aangenomen')}
-                  >
-                    Aannemen
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy !== null || row.status === 'in_behandeling'}
-                    onClick={() => zetStatus(row.id, 'in_behandeling')}
-                  >
-                    In behandeling
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy !== null || row.status === 'afgewezen'}
-                    onClick={() => zetStatus(row.id, 'afgewezen')}
-                  >
-                    Afwijzen
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
+      {rows.map((row) => (
+        <ApplicationCard
+          key={row.id}
+          row={row}
+          stand={votes[row.id] ?? { ja: 0, nee: 0, mine: null }}
+          isAdmin={isAdmin}
+          bezig={busy === row.id}
+          geblokkeerd={busy !== null}
+          onStem={(keuze) => stem(row.id, keuze)}
+          onStatus={(status) => zetStatus(row.id, status)}
+        />
+      ))}
     </ul>
+  );
+}
+
+export interface ApplicationCardProps {
+  row: ApplicationRow;
+  stand: VoteTally;
+  isAdmin: boolean;
+  bezig: boolean;
+  /** Uitgeschakeld wanneer er elders al een actie loopt. */
+  geblokkeerd: boolean;
+  onStem: (keuze: 'ja' | 'nee') => void;
+  onStatus: (status: string) => void;
+}
+
+/**
+ * Eén sollicitatie.
+ *
+ * Los van het overzicht, zodat de kaart op zichzelf te bekijken en te
+ * beoordelen is zonder dat er een ingelogde sessie en een database bij komen
+ * kijken.
+ */
+export function ApplicationCard({
+  row,
+  stand,
+  isAdmin,
+  bezig,
+  geblokkeerd,
+  onStem,
+  onStatus,
+}: ApplicationCardProps) {
+  const status = STATUS[row.status] ?? STATUS['nieuw']!;
+  const besloten = row.status === 'aangenomen' || row.status === 'afgewezen';
+
+  return (
+<li
+  key={row.id}
+  className="relative overflow-hidden rounded-xl border border-line bg-panel"
+>
+  {/* Het streepje links draagt de statuskleur over de hele kaart. */}
+  <span
+    aria-hidden
+    className={`absolute inset-y-0 left-0 w-1 ${status.rand}`}
+  />
+
+  {/* ---------- Kop ----------
+
+      Naam, status en de stand stonden op één regel naast elkaar.
+      Op een telefoon brak dat in vier stukken. Nu staat elk ding
+      op zijn eigen regel, in volgorde van belangrijkheid. */}
+  <div className={`border-b border-line-soft px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6 ${status.vlak}`}>
+    <div className="flex items-center gap-3">
+      {row.avatar_url ? (
+        <Image
+          src={row.avatar_url}
+          alt=""
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-line"
+        />
+      ) : (
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-panel-hover text-xs font-medium text-muted ring-1 ring-line">
+          {row.name.slice(0, 2).toUpperCase()}
+        </span>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-display text-[17px] leading-tight tracking-wide text-creme">
+          {row.name}
+        </p>
+        {row.discord_username ? (
+          <p className="truncate text-xs text-muted">@{row.discord_username}</p>
+        ) : null}
+      </div>
+
+      <span
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] ${status.pil}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${status.stip}`} aria-hidden />
+        {status.label}
+      </span>
+    </div>
+
+    {/* Losse feiten op één regel, met de stand er tegenover. */}
+    <div className="mt-2.5 flex items-center justify-between gap-3">
+      <p className="min-w-0 truncate text-[11px] text-muted-soft">
+        {/* "22-09-2026, 18:06" werd op een telefoon afgekapt tot "18:...".
+            "2 uur geleden" past wel, en zegt bij een sollicitatie meer. */}
+        {[row.age ? `${row.age} jaar` : null, row.phone, relativeTime(row.created_at)]
+          .filter(Boolean)
+          .join('  ·  ')}
+      </p>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Teller icoon="check" aantal={stand.ja} toon="groen" />
+        <Teller icoon="cross" aantal={stand.nee} toon="rood" />
+      </div>
+    </div>
+  </div>
+
+  {/* ---------- Inhoud ---------- */}
+  <div className="space-y-3 px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6">
+    <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
+    {row.experience || row.availability ? (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Veld label="Ervaring in FiveM" waarde={row.experience} />
+        <Veld label="Wanneer online" waarde={row.availability} />
+      </div>
+    ) : null}
+  </div>
+
+  {/* ---------- Stemmen ----------
+
+      Op een afgehandelde sollicitatie valt niets meer te stemmen.
+      De stand blijft staan als verantwoording van het besluit, maar
+      de knoppen verdwijnen. */}
+  {besloten ? null : (
+    <div className="border-t border-line-soft px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
+          Jouw stem
+        </span>
+
+        <StemKnop
+          actief={stand.mine === 'ja'}
+          toon="groen"
+          disabled={bezig}
+          onClick={() => onStem('ja')}
+          label="Voor"
+        />
+        <StemKnop
+          actief={stand.mine === 'nee'}
+          toon="rood"
+          disabled={bezig}
+          onClick={() => onStem('nee')}
+          label="Tegen"
+        />
+      </div>
+
+      <p className="mt-2 text-[11px] leading-relaxed text-muted-soft">
+        {stand.mine
+          ? 'Nog een keer op dezelfde knop klikken trekt je stem in.'
+          : 'Je stem is advies — de Lead neemt het besluit.'}
+      </p>
+    </div>
+  )}
+
+  {/* ---------- Beslissen (alleen Lead) ---------- */}
+  {isAdmin ? (
+    <div className="border-t border-line-soft bg-panel-high px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
+      {row.handled_by ? (
+        <p className="mb-2.5 text-[11px] text-muted-soft">
+          Laatst behandeld door {row.handled_by}
+          {row.handled_at ? ` op ${formatDateTime(row.handled_at)}` : ''}.
+        </p>
+      ) : null}
+
+      {/* De twee besluiten naast elkaar, "in behandeling" eronder
+          over de volle breedte. Drie knoppen op een rij worden op
+          een telefoon onleesbaar smal. */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <Button
+          type="button"
+          size="sm"
+          variant="primary"
+          loading={bezig}
+          disabled={geblokkeerd || row.status === 'aangenomen'}
+          onClick={() => onStatus('aangenomen')}
+        >
+          Aannemen
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="danger"
+          disabled={geblokkeerd || row.status === 'afgewezen'}
+          onClick={() => onStatus('afgewezen')}
+        >
+          Afwijzen
+        </Button>
+        <span className="col-span-2 sm:col-auto">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="w-full sm:w-auto"
+            disabled={geblokkeerd || row.status === 'in_behandeling'}
+            onClick={() => onStatus('in_behandeling')}
+          >
+            In behandeling
+          </Button>
+        </span>
+      </div>
+    </div>
+  ) : null}
+</li>
   );
 }
 

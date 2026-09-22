@@ -38,8 +38,12 @@ export function Wordmark({ variant = 'compact', className = '', priority = false
         className="h-9 w-auto shrink-0 sm:h-10"
       />
       <span className="flex min-w-0 flex-col leading-none">
+        {/* Op een telefoon brak "The Sondravo Family" over twee regels en
+            duwde de balk uit model. Daar staat nu alleen "Sondravo", op één
+            regel; het merkteken ernaast vertelt de rest. */}
         <span className="font-display text-[15px] font-semibold uppercase tracking-[0.13em] text-creme sm:text-base">
-          The Sondravo Family
+          <span className="whitespace-nowrap sm:hidden">Sondravo</span>
+          <span className="hidden whitespace-nowrap sm:inline">The Sondravo Family</span>
         </span>
         <span className="mt-1 hidden text-[10px] uppercase tracking-[0.3em] text-muted sm:block">
           Official Family Registry
