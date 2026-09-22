@@ -6,6 +6,7 @@ const {
   UserSelectMenuBuilder,StringSelectMenuBuilder
 }=require('discord.js');
 const {styleAllSheets}=require('./sheet-style-v3');
+const registry=require('./registry-bridge');
 
 const CFG={
   token:process.env.DISCORD_TOKEN,
@@ -80,7 +81,10 @@ function mainButtons(){return[new ActionRowBuilder().addComponents(new ButtonBui
 async function refreshDashboardMessage(guild){const ch=await setting('dashboard_channel_id'),mid=await setting('dashboard_message_id');if(!ch||!mid)return;try{const c=await guild.channels.fetch(ch);const m=await c.messages.fetch(mid);await m.edit({embeds:[await dashboardEmbed(guild)],components:mainButtons()})}catch(e){console.warn('⚠️ Dashboard message niet bijgewerkt:',e.message)}}
 function scheduleMemberSync(guild){clearTimeout(syncTimer);syncTimer=setTimeout(async()=>{try{await refreshAll(guild);await refreshDashboardMessage(guild);console.log('✅ Discord rolwijziging gesynchroniseerd')}catch(e){console.warn('⚠️ Automatische ledensync mislukt:',e.message)}},2000)}
 
-const commands=[new SlashCommandBuilder().setName('setup').setDescription('Plaats of herstel het Sondravo management dashboard'),new SlashCommandBuilder().setName('saldo').setDescription('Toon actuele gangpot'),new SlashCommandBuilder().setName('correctie').setDescription('Founder saldo-correctie').addStringOption(o=>o.setName('type').setDescription('plus of min').setRequired(true).addChoices({name:'Plus',value:'plus'},{name:'Min',value:'min'})).addNumberOption(o=>o.setName('bedrag').setDescription('Bedrag').setRequired(true).setMinValue(1)).addStringOption(o=>o.setName('reden').setDescription('Reden').setRequired(true))].map(c=>c.toJSON());
+const commands=[new SlashCommandBuilder().setName('setup').setDescription('Plaats of herstel het Sondravo management dashboard'),new SlashCommandBuilder().setName('saldo').setDescription('Toon actuele gangpot'),new SlashCommandBuilder().setName('correctie').setDescription('Founder saldo-correctie').addStringOption(o=>o.setName('type').setDescription('plus of min').setRequired(true).addChoices({name:'Plus',value:'plus'},{name:'Min',value:'min'})).addNumberOption(o=>o.setName('bedrag').setDescription('Bedrag').setRequired(true).setMinValue(1)).addStringOption(o=>o.setName('reden').setDescription('Reden').setRequired(true)),
+  new SlashCommandBuilder().setName('new').setDescription('Zet een lid direct op de website-ledenlijst').addUserOption(o=>o.setName('lid').setDescription('Het Discord-account van het nieuwe lid').setRequired(true)).addStringOption(o=>o.setName('rang').setDescription('Rang op de website (standaard Zazavao)').addChoices(...registry.RANKS)).addStringOption(o=>o.setName('naam').setDescription('Naam op de website (standaard de Discord-weergavenaam)')),
+  new SlashCommandBuilder().setName('verwijder').setDescription('Haal een lid van de website-ledenlijst').addUserOption(o=>o.setName('lid').setDescription('Het Discord-account dat weg moet').setRequired(true))
+].map(c=>c.toJSON());
 const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMembers]});
 
 client.once(Events.ClientReady,async c=>{console.log(`✅ Online als ${c.user.tag}`);try{await ensureSheets();const guild=await c.guilds.fetch(CFG.guildId);await guild.members.fetch();console.log(`✅ ${guild.members.cache.size} Discord-leden ingeladen`);await refreshAll(guild);try{if(await setting('sheet_style_version')!==CFG.styleVersion){await styleAllSheets(sheets,CFG.spreadsheetId,T);await setSetting('sheet_style_version',CFG.styleVersion);console.log('✅ Alle Google Sheet tabs v3 opgemaakt')}else console.log('✅ Sheet-opmaak is al actueel')}catch(e){console.warn('⚠️ Sheet styling overgeslagen:',e.message)}const rest=new REST({version:'10'}).setToken(CFG.token);await rest.put(Routes.applicationGuildCommands(CFG.clientId,CFG.guildId),{body:commands});console.log('✅ Slash commands geregistreerd');await refreshDashboardMessage(guild)}catch(e){console.error('❌ Startup fout:',e)}});
@@ -93,6 +97,34 @@ client.on(Events.InteractionCreate,async i=>{try{
     if(i.commandName==='setup'){if(!canManage(i))throw new Error('Alleen leiding kan dit doen.');await i.deferReply({ephemeral:true});const oldCh=await setting('dashboard_channel_id'),oldMid=await setting('dashboard_message_id');let msg=null;if(oldCh===i.channelId&&oldMid){try{const c=await i.guild.channels.fetch(oldCh);msg=await c.messages.fetch(oldMid);await msg.edit({embeds:[await dashboardEmbed(i.guild)],components:mainButtons()})}catch{msg=null}}if(!msg){msg=await i.channel.send({embeds:[await dashboardEmbed(i.guild)],components:mainButtons()});await setSetting('dashboard_channel_id',i.channelId);await setSetting('dashboard_message_id',msg.id)}return i.editReply('✅ Dashboard staat klaar en is gekoppeld.')}
     if(i.commandName==='saldo'){const t=await totals();return i.reply({embeds:[base().setTitle('💰 Gangpot').setDescription(`Actueel saldo: **${money(t.balance)}**`)],ephemeral:true})}
     if(i.commandName==='correctie'){if(!isFounder(i))throw new Error('Alleen Founder kan dit doen.');await i.deferReply({ephemeral:true});const type=i.options.getString('type'),amount=i.options.getNumber('bedrag'),reason=i.options.getString('reden');await addTx(type==='plus'?'CORRECTIE_PLUS':'CORRECTIE_MIN',amount,i.user,reason,'correctie');await addLog('SALDOCORRECTIE',i.user,`${type} ${money(amount)} • ${reason}`);await refreshAll(i.guild);await refreshDashboardMessage(i.guild);return i.editReply('✅ Correctie verwerkt.')}
+    if(i.commandName==='new'){
+      if(!canManage(i))throw new Error('Alleen leiding kan dit doen.');
+      if(!registry.isEnabled())throw new Error('De website-koppeling is niet ingesteld. Zet REGISTRY_URL en BOT_API_SECRET.');
+      await i.deferReply({ephemeral:true});
+      const user=i.options.getUser('lid');
+      if(user.bot)throw new Error('Een bot kan geen familielid zijn.');
+      const member=await i.guild.members.fetch(user.id).catch(()=>null);
+      const name=(i.options.getString('naam')||member?.displayName||user.globalName||user.username||'').trim().slice(0,64);
+      if(!name)throw new Error('Kon geen naam bepalen. Geef er zelf een mee met de optie "naam".');
+      const rank=i.options.getString('rang')||registry.DEFAULT_RANK;
+      const avatarUrl=(member||user).displayAvatarURL({extension:'png',size:256});
+      const actor=i.user.globalName||i.user.username;
+      const res=await registry.addMember({discordUserId:user.id,name,discordUsername:user.username,rank,avatarUrl,actor});
+      await addLog('WEBSITE_LID_TOEGEVOEGD',i.user,`${name} • ${registry.rankLabel(rank)}`);
+      return i.editReply(res.created
+        ?`✅ **${name}** staat nu op de website onder **${registry.rankLabel(rank)}**.`
+        :`ℹ️ **${name}** stond al op de website. De Discord-naam en avatar zijn bijgewerkt.`)
+    }
+    if(i.commandName==='verwijder'){
+      if(!canManage(i))throw new Error('Alleen leiding kan dit doen.');
+      if(!registry.isEnabled())throw new Error('De website-koppeling is niet ingesteld. Zet REGISTRY_URL en BOT_API_SECRET.');
+      await i.deferReply({ephemeral:true});
+      const user=i.options.getUser('lid');
+      const actor=i.user.globalName||i.user.username;
+      const res=await registry.removeMember({discordUserId:user.id,actor});
+      await addLog('WEBSITE_LID_VERWIJDERD',i.user,String(res.removed||user.username));
+      return i.editReply(`🗑️ **${res.removed}** is van de website-ledenlijst gehaald.`)
+    }
     return;
   }
   if(i.isButton()){

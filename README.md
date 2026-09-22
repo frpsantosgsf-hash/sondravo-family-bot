@@ -253,6 +253,8 @@ De bot gebruikt environment variables zodat tokens, IDs en Google-gegevens niet 
 | `WEEKLY_AMOUNT` | weekpotbedrag per persoon, bijvoorbeeld `50000` |
 | `EMBED_COLOR` | kleur van Discord embeds, bijvoorbeeld `#8B0000` |
 | `FOOTER_TEXT` | tekst onderaan de embeds |
+| `REGISTRY_URL` | URL van de website-ledenlijst, bijv. `https://sondravo.vercel.app` |
+| `BOT_API_SECRET` | gedeeld geheim tussen de bot en de website (zie hieronder) |
 
 ### ⚠️ Geheimen
 
@@ -362,6 +364,49 @@ Controleer:
 ### Dashboard toont oude gegevens
 
 Voer geen transacties rechtstreeks in Sheets in als de bot die wijziging ook hoort te verwerken. Gebruik de Discord-knoppen. Controleer bij problemen de Render logs en herstart/deploy de service indien nodig.
+
+---
+
+## 🌐 Website: de ledenlijst
+
+Naast deze bot staat in de map [`registry/`](registry/) de website van The
+Sondravo Family: een voorpagina met ons logo en onze intro-clip, en daarachter
+een publieke ledenlijst per rang.
+
+- Iedereen met de link kan de ledenlijst bekijken, zonder account.
+- Alleen goedgekeurde Lead/Admin-accounts kunnen iets wijzigen, via Discord-login.
+- De volledige installatiehandleiding staat in [`registry/README.md`](registry/README.md).
+
+De website gebruikt Supabase (PostgreSQL) en staat volledig los van de Google
+Sheets-administratie van deze bot. De bot blijft dus gewoon doen wat hij deed.
+
+### Leden toevoegen vanuit Discord
+
+De bot kan iemand rechtstreeks op de website zetten:
+
+```text
+/new lid:@Ferry rang:Zazavao
+/verwijder lid:@Xavier
+```
+
+Alleen leiding kan deze commando's gebruiken. De wijziging verschijnt meteen op
+de site en komt in de History te staan, met de naam van degene die het commando
+gaf.
+
+**Instellen:**
+
+1. Genereer een geheim, bijvoorbeeld met `openssl rand -hex 32`.
+2. Zet in Vercel (bij de website): `BOT_API_SECRET` en `SUPABASE_SERVICE_ROLE_KEY`.
+3. Zet in Render (bij deze bot): `BOT_API_SECRET` met exact dezelfde waarde,
+   plus `REGISTRY_URL` met de URL van de site.
+4. Herstart de bot.
+
+Zijn deze variabelen niet gezet, dan melden de commando's netjes dat de
+koppeling ontbreekt. De rest van de bot werkt gewoon door.
+
+De bot praat niet rechtstreeks met de database: hij roept `/api/bot/member` op
+de website aan met het gedeelde geheim in een header. Zo hoeft de bot geen
+database-sleutels te kennen.
 
 ---
 
