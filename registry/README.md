@@ -382,11 +382,11 @@ Vier environment variables:
 | Variable | Standaard | Wat het doet |
 |----------|-----------|--------------|
 | `NEXT_PUBLIC_HERO_LOGO_SECONDS` | `3.5` | Hoe lang het logo in beeld blijft, in seconden |
-| `NEXT_PUBLIC_HERO_CLIP_SECONDS` | `15` | Hoe lang het fragment speelt, in seconden |
+| `NEXT_PUBLIC_HERO_CLIP_SECONDS` | `30` | Hoe lang het fragment speelt, in seconden |
 | `NEXT_PUBLIC_HERO_CLIP_FROM_END` | `true` | Rekent terug vanaf het eind van de clip |
 | `NEXT_PUBLIC_HERO_CLIP_START` | `0` | Beginseconde, alleen gebruikt als `FROM_END` uit staat |
 
-Standaard speelt de intro dus de **laatste 15 seconden** van de clip. De
+Standaard speelt de intro dus de **laatste 30 seconden** van de clip. De
 speler leest de lengte van de video zelf uit en rekent terug, zodat die lengte
 nergens hard ingetypt staat — verwissel je de clip, dan klopt het nog steeds.
 Een halve seconde voor het eind stopt het fragment, zodat YouTube zijn

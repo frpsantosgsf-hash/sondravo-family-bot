@@ -42,7 +42,7 @@ function readFlag(value: string | undefined, fallback: boolean): boolean {
 export function resolveHeroTiming(): HeroTiming {
   return {
     logoMs: readSeconds(process.env.NEXT_PUBLIC_HERO_LOGO_SECONDS, 3.5) * 1000,
-    clipMs: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_SECONDS, 15) * 1000,
+    clipMs: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_SECONDS, 30) * 1000,
     startSeconds: readSeconds(process.env.NEXT_PUBLIC_HERO_CLIP_START, 0),
     fromEnd: readFlag(process.env.NEXT_PUBLIC_HERO_CLIP_FROM_END, true),
   };
