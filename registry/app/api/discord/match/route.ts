@@ -19,36 +19,29 @@ interface Kandidaat {
 }
 
 /**
- * Zoekt de Discord-accounts die bij een naam horen, in drie rondes die steeds
- * losser worden. Er wordt pas naar de volgende ronde gekeken als de vorige
- * niets oplevert, zodat een exacte naam het altijd wint van een gelijkende.
+ * Zoekt alle Discord-accounts die bij een naam zouden kunnen horen.
+ *
+ * Bewust in één ronde, niet in stappen van streng naar los. Een account dat
+ * exact "Jayden" heet is namelijk géén zekere treffer zolang er ook een
+ * "Jayden Loopie" in de server zit — dan weet alleen een mens wie bedoeld is.
+ * Door alles in dezelfde mand te gooien ziet de koppeling die twijfel, en
+ * laat hij het lid met rust in plaats van te gokken.
  */
-function zoekKandidaten(naam: string, kandidaten: Kandidaat[]): {
-  treffers: Kandidaat[];
-  exact: boolean;
-} {
-  const exact = kandidaten.filter((k) => k.namen.includes(naam));
-  if (exact.length > 0) return { treffers: exact, exact: true };
+function zoekKandidaten(
+  naam: string,
+  kandidaten: Kandidaat[],
+): { treffers: Kandidaat[]; exact: boolean } {
+  const past = (n: string) => {
+    if (n === naam) return true;
+    if (n.length < MIN_LENGTE_VOOR_GELIJKENIS || naam.length < MIN_LENGTE_VOOR_GELIJKENIS) {
+      return false;
+    }
+    return n.includes(naam) || naam.includes(n);
+  };
 
-  if (naam.length < MIN_LENGTE_VOOR_GELIJKENIS) return { treffers: [], exact: false };
-
-  // "Ryan" vindt "RyanSondravo", en "SDF Ryan" vindt "Ryan".
-  const begint = kandidaten.filter((k) =>
-    k.namen.some(
-      (n) =>
-        n.length >= MIN_LENGTE_VOOR_GELIJKENIS &&
-        (n.startsWith(naam) || naam.startsWith(n)),
-    ),
-  );
-  if (begint.length > 0) return { treffers: begint, exact: false };
-
-  // Laatste ronde: de naam zit ergens middenin, zoals "xXDaveXx".
-  const bevat = kandidaten.filter((k) =>
-    k.namen.some(
-      (n) => n.length >= MIN_LENGTE_VOOR_GELIJKENIS && (n.includes(naam) || naam.includes(n)),
-    ),
-  );
-  return { treffers: bevat, exact: false };
+  const treffers = kandidaten.filter((k) => k.namen.some(past));
+  const exact = treffers.length === 1 && treffers[0]!.namen.includes(naam);
+  return { treffers, exact };
 }
 
 /**
@@ -92,6 +85,16 @@ export async function POST() {
     return NextResponse.json({ error: 'Kon de ledenlijst niet ophalen.' }, { status: 500 });
   }
 
+  // Leden die al een Discord-account hebben blijven ongemoeid. Anders zou een
+  // tweede klik op Koppelen een koppeling die je met de hand hebt rechtgezet
+  // zo weer overschrijven met dezelfde verkeerde gok.
+  const { data: alGekoppeldeRijen } = await supabase
+    .from('private_member_data')
+    .select('member_id')
+    .not('discord_user_id', 'is', null);
+
+  const heeftAlEenKoppeling = new Set((alGekoppeldeRijen ?? []).map((rij) => rij.member_id));
+
   const kandidaten: Kandidaat[] = guildLeden.map((lid) => ({
     discordUserId: lid.discordUserId,
     username: lid.username,
@@ -105,8 +108,14 @@ export async function POST() {
   const viaGelijkenis: string[] = [];
   const nietGevonden: string[] = [];
   const meerdereOpties: string[] = [];
+  const overgeslagen: string[] = [];
 
   for (const lid of leden) {
+    if (heeftAlEenKoppeling.has(lid.id)) {
+      overgeslagen.push(lid.name);
+      continue;
+    }
+
     const { treffers, exact } = zoekKandidaten(normalizeName(lid.name), kandidaten);
 
     if (treffers.length === 0) {
@@ -160,6 +169,7 @@ export async function POST() {
     viaGelijkenis,
     nietGevonden,
     meerdereOpties,
+    overgeslagen,
     discordLeden: guildLeden.length,
   });
 }

@@ -15,6 +15,7 @@ interface MatchReport {
   viaGelijkenis?: string[];
   nietGevonden?: string[];
   meerdereOpties?: string[];
+  overgeslagen?: string[];
 }
 
 function ReportList({ label, hint, names }: { label: string; hint: string; names: string[] }) {
@@ -217,6 +218,11 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
               label="Meerdere opties"
               hint="Meer dan één account past bij deze naam, dus deze zijn met rust gelaten. Handmatig koppelen via het potloodje."
               names={matchReport.meerdereOpties ?? []}
+            />
+            <ReportList
+              label="Al gekoppeld"
+              hint="Deze hadden al een Discord-account en zijn niet aangeraakt. Klopt er eentje niet, pas hem dan aan via het potloodje."
+              names={matchReport.overgeslagen ?? []}
             />
           </div>
         ) : null}
