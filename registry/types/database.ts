@@ -101,6 +101,7 @@ export interface Database {
           id: number;
           family_name: string;
           member_limit: number;
+          applications_open: boolean;
           updated_at: string;
         };
         Insert: {
@@ -147,6 +148,11 @@ export interface Database {
           handled_by: string | null;
           handled_at: string | null;
           admin_note: string | null;
+          voting_closed: boolean;
+          archived_at: string | null;
+          archived_by: string | null;
+          discord_message_id: string | null;
+          discord_status_message_id: string | null;
         };
         // Insturen loopt via submit_application(); rechtstreeks inserten mag niet.
         Insert: never;
@@ -237,6 +243,22 @@ export interface Database {
       admin_set_application_status: {
         Args: { p_id: string; p_status: string; p_note?: string | null };
         Returns: Database['public']['Tables']['applications']['Row'];
+      };
+      admin_set_voting_closed: {
+        Args: { p_id: string; p_closed: boolean };
+        Returns: Database['public']['Tables']['applications']['Row'];
+      };
+      admin_archive_application: {
+        Args: { p_id: string };
+        Returns: Database['public']['Tables']['applications']['Row'];
+      };
+      admin_set_applications_open: {
+        Args: { p_open: boolean };
+        Returns: Database['public']['Tables']['settings']['Row'];
+      };
+      set_application_discord_message: {
+        Args: { p_id: string; p_message_id?: string | null; p_status_message_id?: string | null };
+        Returns: void;
       };
     };
     Enums: Record<never, never>;

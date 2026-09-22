@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { SiteNav } from '@/components/site/SiteNav';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { AuthControls } from '@/components/site/AuthControls';
-import { ApplicationsBoard } from '@/components/applications/ApplicationsBoard';
+import { ApplicationsPanel } from '@/components/applications/ApplicationsPanel';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
 import { getRegistryData } from '@/lib/data';
 
@@ -81,7 +81,7 @@ export default async function SollicitatiesPage() {
         </Link>
 
         <div className="mt-6 sm:mt-8">
-          <ApplicationsBoard />
+          <ApplicationsPanel isAdmin={viewer?.isAdmin === true} />
         </div>
       </main>
 

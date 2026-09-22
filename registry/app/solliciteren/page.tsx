@@ -6,6 +6,7 @@ import { AuthControls } from '@/components/site/AuthControls';
 import { getViewerAccess, mayApply, mayViewRegistry } from '@/lib/access';
 import { getRegistryData } from '@/lib/data';
 import { getMyApplication } from '@/lib/applications';
+import { ApplicationsClosed } from '@/components/site/ApplicationsClosed';
 import { formatDateTime } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,25 @@ export default async function SolliciterenPage() {
   const toegang = mayApply(access);
   // Een afgehandelde sollicitatie blokkeert niets meer: dan mag je opnieuw.
   const staatOpen = mijn !== null && ['nieuw', 'in_behandeling'].includes(mijn.status);
+
+  /*
+   * Deur dicht? Dan geen formulier en geen uitleg over rollen, maar één
+   * duidelijk scherm. Wie zelf al iets heeft lopen ziet nog wel zijn status:
+   * die sollicitatie loopt gewoon door.
+   */
+  if (!settings.applicationsOpen && !staatOpen) {
+    return (
+      <>
+        <SiteNav viewer={viewer} current="/solliciteren" showRegistry={mayViewRegistry(access)} />
+
+        <main id="hoofdinhoud" className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
+          <ApplicationsClosed familyName={settings.familyName} />
+        </main>
+
+        <SiteFooter familyName={settings.familyName} />
+      </>
+    );
+  }
 
   return (
     <>

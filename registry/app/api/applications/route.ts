@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
-import { notifyDiscordStatus } from '@/lib/applications';
+import {
+  notifyDiscordStatus,
+  onthoudDiscordBericht,
+  verwijderDiscordBericht,
+} from '@/lib/applications';
 import type { ApplicationRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -25,17 +29,25 @@ export interface VoteTally {
  * wat nog openstaat — Row Level Security zorgt daarvoor, deze route hoeft dat
  * niet na te bouwen. Afgewezen sollicitaties blijven zo binnen de leiding.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const access = await getViewerAccess();
 
   if (!mayViewRegistry(access)) {
     return NextResponse.json({ error: 'Geen toegang.' }, { status: 403 });
   }
 
+  // Het archief is alleen voor de Lead. Een lid dat het adres raadt krijgt
+  // gewoon zijn eigen lijst: RLS laat hem geen gearchiveerde rij zien.
+  const wilArchief =
+    new URL(request.url).searchParams.get('archief') === '1' && access.isAdmin;
+
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('applications')
-    .select('*')
+  const query = supabase.from('applications').select('*');
+
+  const { data, error } = await (wilArchief
+    ? query.not('archived_at', 'is', null)
+    : query.is('archived_at', null)
+  )
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -87,13 +99,31 @@ async function tallyVotes(
   return tally;
 }
 
-const patchSchema = z.object({
-  id: z.string().uuid('Ongeldige sollicitatie.'),
-  status: z.enum(['nieuw', 'in_behandeling', 'aangenomen', 'afgewezen']),
-  note: z.string().trim().max(1000).optional(),
-});
+const patchSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('status'),
+    id: z.string().uuid('Ongeldige sollicitatie.'),
+    status: z.enum(['nieuw', 'in_behandeling', 'aangenomen', 'afgewezen']),
+    note: z.string().trim().max(1000).optional(),
+  }),
+  z.object({
+    action: z.literal('voting'),
+    id: z.string().uuid('Ongeldige sollicitatie.'),
+    closed: z.boolean(),
+  }),
+  z.object({
+    action: z.literal('archive'),
+    id: z.string().uuid('Ongeldige sollicitatie.'),
+  }),
+]);
 
-/** Afhandelen. Alleen de Lead beslist; stemmen van leden zijn advies. */
+/**
+ * Afhandelen, stemming sluiten of archiveren. Alleen de Lead.
+ *
+ * Stemmen van leden zijn advies; het besluit ligt hier. Archiveren haalt de
+ * sollicitatie uit beeld bij de leden én ruimt de berichten in Discord op,
+ * zodat het kanaal niet volloopt met afgehandelde zaken.
+ */
 export async function PATCH(request: NextRequest) {
   const gate = await requireAdmin();
   if (!gate.ok) {
@@ -116,10 +146,49 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = await createClient();
+  const input = parsed.data;
+
+  if (input.action === 'voting') {
+    const { error } = await supabase.rpc('admin_set_voting_closed', {
+      p_id: input.id,
+      p_closed: input.closed,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: 'De stemming bijwerken lukte niet.' }, { status: 500 });
+    }
+
+    revalidatePath('/sollicitaties');
+    return NextResponse.json({ ok: true });
+  }
+
+  if (input.action === 'archive') {
+    // Eerst de bericht-ID's ophalen: na het archiveren zijn ze nog wel te
+    // lezen, maar zo staat alles wat we nodig hebben in één keer klaar.
+    const { data: voor } = await supabase
+      .from('applications')
+      .select('discord_message_id, discord_status_message_id')
+      .eq('id', input.id)
+      .maybeSingle();
+
+    const { error } = await supabase.rpc('admin_archive_application', { p_id: input.id });
+
+    if (error) {
+      return NextResponse.json({ error: 'Archiveren lukte niet.' }, { status: 500 });
+    }
+
+    await verwijderDiscordBericht(voor?.discord_message_id ?? null);
+    await verwijderDiscordBericht(voor?.discord_status_message_id ?? null);
+
+    revalidatePath('/sollicitaties');
+    revalidatePath('/leden');
+    return NextResponse.json({ ok: true });
+  }
+
   const { data: row, error } = await supabase.rpc('admin_set_application_status', {
-    p_id: parsed.data.id,
-    p_status: parsed.data.status,
-    p_note: parsed.data.note ?? null,
+    p_id: input.id,
+    p_status: input.status,
+    p_note: input.note ?? null,
   });
 
   if (error) {
@@ -132,12 +201,19 @@ export async function PATCH(request: NextRequest) {
     const { data: stemRijen } = await supabase
       .from('application_votes')
       .select('vote')
-      .eq('application_id', parsed.data.id);
+      .eq('application_id', input.id);
 
-    await notifyDiscordStatus(row, {
+    const messageId = await notifyDiscordStatus(row, {
       ja: (stemRijen ?? []).filter((stem) => stem.vote === 'ja').length,
       nee: (stemRijen ?? []).filter((stem) => stem.vote === 'nee').length,
     });
+
+    if (messageId) {
+      // Een vorige statusmelding vervangen we: anders staan er bij een besluit
+      // dat twee keer wisselt drie berichten over dezelfde persoon.
+      await verwijderDiscordBericht(row.discord_status_message_id);
+      await onthoudDiscordBericht(input.id, null, messageId);
+    }
   }
 
   revalidatePath('/leden');

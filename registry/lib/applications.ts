@@ -103,13 +103,21 @@ const STATUS_STIJL: Record<string, { kleur: number; kop: string }> = {
   afgewezen: { kleur: 0xd71920, kop: '❌  Sollicitatie afgewezen' },
 };
 
-/** Stuurt één bericht naar de webhook. Faalt nooit hardop. */
-async function stuurNaarDiscord(embed: Record<string, unknown>): Promise<void> {
+/**
+ * Stuurt één bericht naar de webhook en geeft het bericht-ID terug.
+ *
+ * Dat ID hebben we nodig om het bericht later weer op te kunnen ruimen. Met
+ * ?wait=true wacht Discord tot het bericht bestaat en geeft hij het terug;
+ * zonder die parameter krijg je alleen een lege bevestiging.
+ *
+ * Faalt nooit hardop: een kapotte webhook mag geen sollicitatie tegenhouden.
+ */
+async function stuurNaarDiscord(embed: Record<string, unknown>): Promise<string | null> {
   const webhookUrl = getApplicationWebhookUrl();
-  if (!webhookUrl) return;
+  if (!webhookUrl) return null;
 
   try {
-    await fetch(webhookUrl, {
+    const response = await fetch(`${webhookUrl}?wait=true`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -120,8 +128,31 @@ async function stuurNaarDiscord(embed: Record<string, unknown>): Promise<void> {
         allowed_mentions: { parse: [] },
       }),
     });
+
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { id?: string };
+    return typeof payload.id === 'string' ? payload.id : null;
   } catch {
     // Stilte is hier het juiste gedrag: de sollicitatie staat al opgeslagen.
+    return null;
+  }
+}
+
+/**
+ * Haalt een eerder geplaatst bericht weg uit het kanaal.
+ *
+ * Een webhook mag zijn eigen berichten verwijderen, dus hier is geen bot-token
+ * voor nodig. Bestaat het bericht niet meer, dan is dat ook goed.
+ */
+export async function verwijderDiscordBericht(messageId: string | null): Promise<void> {
+  const webhookUrl = getApplicationWebhookUrl();
+  if (!webhookUrl || !messageId) return;
+
+  try {
+    await fetch(`${webhookUrl}/messages/${messageId}`, { method: 'DELETE' });
+  } catch {
+    // Het bericht is dan al weg, of Discord ligt eruit. Geen van beide mag
+    // het archiveren tegenhouden.
   }
 }
 
@@ -131,7 +162,10 @@ async function stuurNaarDiscord(embed: Record<string, unknown>): Promise<void> {
  * Mag nooit de inzending laten mislukken: als de webhook eruit ligt, staat de
  * sollicitatie nog steeds netjes op de site.
  */
-export async function notifyDiscord(input: ApplicationInput, access: ViewerAccess): Promise<void> {
+export async function notifyDiscord(
+  input: ApplicationInput,
+  access: ViewerAccess,
+): Promise<string | null> {
   const stijl = STATUS_STIJL['nieuw']!;
 
   // De korte gegevens naast elkaar, de verhalen eronder. Discord zet drie
@@ -157,7 +191,7 @@ export async function notifyDiscord(input: ApplicationInput, access: ViewerAcces
     });
   }
 
-  await stuurNaarDiscord({
+  return stuurNaarDiscord({
     author: {
       name: input.name,
       icon_url: access.discord.avatarUrl ?? undefined,
@@ -182,9 +216,9 @@ export async function notifyDiscord(input: ApplicationInput, access: ViewerAcces
 export async function notifyDiscordStatus(
   row: Pick<ApplicationRow, 'name' | 'status' | 'discord_user_id' | 'avatar_url' | 'handled_by'>,
   stemmen?: { ja: number; nee: number },
-): Promise<void> {
+): Promise<string | null> {
   const stijl = STATUS_STIJL[row.status];
-  if (!stijl) return;
+  if (!stijl) return null;
 
   const velden: { name: string; value: string; inline?: boolean }[] = [
     {
@@ -199,7 +233,7 @@ export async function notifyDiscordStatus(
     velden.push({ name: 'Stemmen', value: `✅ ${stemmen.ja}   ❌ ${stemmen.nee}`, inline: true });
   }
 
-  await stuurNaarDiscord({
+  return stuurNaarDiscord({
     author: { name: row.name, icon_url: row.avatar_url ?? undefined },
     title: stijl.kop,
     color: stijl.kleur,
@@ -243,3 +277,28 @@ function knip(waarde: string, max: number): string {
 }
 
 export type { ApplicationRow };
+
+/**
+ * Bewaart het ID van een Discord-bericht bij de sollicitatie.
+ *
+ * Loopt via de service-role client: de browser heeft hier niets te zoeken, en
+ * een mislukking mag nooit de inzending of het besluit tegenhouden.
+ */
+export async function onthoudDiscordBericht(
+  applicationId: string,
+  messageId: string | null,
+  statusMessageId: string | null,
+): Promise<void> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+
+  try {
+    await createAdminClient().rpc('set_application_discord_message', {
+      p_id: applicationId,
+      p_message_id: messageId,
+      p_status_message_id: statusMessageId,
+    });
+  } catch {
+    // Dan blijft het bericht straks in Discord staan. Vervelend, maar geen
+    // reden om de actie te laten mislukken.
+  }
+}

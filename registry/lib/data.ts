@@ -17,6 +17,7 @@ import type { AuditLogRow, Json, MemberRow, RankRow } from '@/types/database';
 const FALLBACK_SETTINGS: FamilySettings = {
   familyName: 'The Sondravo Family',
   memberLimit: 20,
+  applicationsOpen: true,
   updatedAt: null,
 };
 
@@ -125,6 +126,7 @@ export const getRegistryData = cache(async (): Promise<RegistryData> => {
     ? {
         familyName: settingsResult.data.family_name,
         memberLimit: settingsResult.data.member_limit,
+        applicationsOpen: settingsResult.data.applications_open !== false,
         updatedAt: settingsResult.data.updated_at,
       }
     : FALLBACK_SETTINGS;

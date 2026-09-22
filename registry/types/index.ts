@@ -40,6 +40,8 @@ export interface RankGroup {
 export interface FamilySettings {
   familyName: string;
   memberLimit: number;
+  /** Staat het sollicitatieformulier open voor nieuwe aanmeldingen? */
+  applicationsOpen: boolean;
   updatedAt: string | null;
 }
 

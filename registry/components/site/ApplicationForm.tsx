@@ -1,18 +1,15 @@
-"use client";
+'use client';
 
-import { useActionState } from "react";
-import { Button } from "@/components/ui/Button";
-import { TextAreaField, TextField } from "@/components/ui/Field";
-import {
-  submitApplicationAction,
-  type ApplicationFormState,
-} from "@/lib/application-actions";
+import { useActionState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { TextAreaField, TextField } from '@/components/ui/Field';
+import { submitApplicationAction, type ApplicationFormState } from '@/lib/application-actions';
 
 export function ApplicationForm() {
-  const [state, formAction, pending] = useActionState<
-    ApplicationFormState | null,
-    FormData
-  >(submitApplicationAction, null);
+  const [state, formAction, pending] = useActionState<ApplicationFormState | null, FormData>(
+    submitApplicationAction,
+    null,
+  );
 
   const errors = state?.ok === false ? (state.fieldErrors ?? {}) : {};
   // Wat er is ingetypt gaat mee terug, zodat een foutje niet het hele
@@ -25,15 +22,11 @@ export function ApplicationForm() {
         role="status"
         className="rounded-xl border border-sondravo-green/40 bg-sondravo-green/10 px-5 py-6 text-center"
       >
-        <p className="text-[13px] font-medium uppercase tracking-[0.16em] text-creme">
-          Verstuurd
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-ink/80">
-          {state.message}
-        </p>
+        <p className="text-[13px] font-medium uppercase tracking-[0.16em] text-creme">Verstuurd</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink/80">{state.message}</p>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Je hoort het via Discord. Je hoeft niets meer te doen — nog een keer
-          insturen kan pas nadat er naar deze sollicitatie gekeken is.
+          Je hoort het via Discord. Je hoeft niets meer te doen — nog een keer insturen kan pas
+          nadat er naar deze sollicitatie gekeken is.
         </p>
       </div>
     );
@@ -58,8 +51,8 @@ export function ApplicationForm() {
           maxLength={64}
           autoComplete="off"
           hint="De naam waarmee je in de stad bekend staat."
-          defaultValue={values?.name ?? ""}
-          error={errors["name"]}
+          defaultValue={values?.name ?? ''}
+          error={errors['name']}
         />
         <TextField
           label="Leeftijd"
@@ -68,8 +61,8 @@ export function ApplicationForm() {
           min={10}
           max={99}
           inputMode="numeric"
-          defaultValue={values?.age ?? ""}
-          error={errors["age"]}
+          defaultValue={values?.age ?? ''}
+          error={errors['age']}
         />
       </div>
 
@@ -79,8 +72,8 @@ export function ApplicationForm() {
         maxLength={32}
         inputMode="tel"
         hint="Optioneel, maar handig als we je willen bereiken."
-        defaultValue={values?.phone ?? ""}
-        error={errors["phone"]}
+        defaultValue={values?.phone ?? ''}
+        error={errors['phone']}
       />
 
       <TextAreaField
@@ -90,8 +83,8 @@ export function ApplicationForm() {
         rows={5}
         maxLength={2000}
         hint="Minimaal een paar zinnen. Dit is waar we het meest naar kijken."
-        defaultValue={values?.motivation ?? ""}
-        error={errors["motivation"]}
+        defaultValue={values?.motivation ?? ''}
+        error={errors['motivation']}
       />
 
       <TextAreaField
@@ -100,8 +93,8 @@ export function ApplicationForm() {
         rows={3}
         maxLength={1000}
         hint="Waar heb je eerder gespeeld, en hoe lang speel je al?"
-        defaultValue={values?.experience ?? ""}
-        error={errors["experience"]}
+        defaultValue={values?.experience ?? ''}
+        error={errors['experience']}
       />
 
       <TextAreaField
@@ -110,8 +103,8 @@ export function ApplicationForm() {
         rows={2}
         maxLength={500}
         hint="Welke dagen en tijden zien we je meestal?"
-        defaultValue={values?.availability ?? ""}
-        error={errors["availability"]}
+        defaultValue={values?.availability ?? ''}
+        error={errors['availability']}
       />
 
       <div className="flex justify-end pt-1">

@@ -67,6 +67,8 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
    */
   const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
   const [importing, setImporting] = useState(false);
+  const [openVoorSollicitaties, setOpenVoorSollicitaties] = useState(settings.applicationsOpen);
+  const [deurBezig, setDeurBezig] = useState(false);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
 
   useEffect(() => {
@@ -80,6 +82,31 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
       toast(state.error, 'error');
     }
   }, [state, toast, onClose]);
+
+  /** Zet het sollicitatieformulier open of dicht. */
+  async function zetDeur(open: boolean) {
+    setDeurBezig(true);
+    try {
+      const response = await fetch('/api/settings/applications', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ open }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        toast(payload.error ?? 'Bijwerken mislukt.', 'error');
+        return;
+      }
+
+      setOpenVoorSollicitaties(open);
+      toast(open ? 'Sollicitaties staan open.' : 'Sollicitaties zijn gesloten.', 'success');
+    } catch {
+      toast('Bijwerken mislukt.', 'error');
+    } finally {
+      setDeurBezig(false);
+    }
+  }
 
   /** Bouwt de ledenlijst op uit de Discord-rollen. */
   async function runDiscordImport() {
@@ -200,6 +227,42 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
           error={errors['memberLimit']}
         />
       </form>
+
+      <div className="mt-6 space-y-3 border-t border-line pt-5">
+        <div>
+          <h3 className="text-[12px] font-medium uppercase tracking-[0.14em] text-muted">
+            Sollicitaties
+          </h3>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
+            Zit de familie vol, zet de deur dan dicht. Bezoekers krijgen dan een nette melding in
+            plaats van een formulier, en er komt niets meer binnen.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-high px-3.5 py-3">
+          <span className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={`h-2 w-2 rounded-full ${
+                openVoorSollicitaties ? 'bg-[#7ddba3]' : 'bg-[#f2a9ac]'
+              }`}
+            />
+            <span className="text-sm text-ink">
+              {openVoorSollicitaties ? 'Open voor nieuwe sollicitaties' : 'Gesloten'}
+            </span>
+          </span>
+
+          <Button
+            type="button"
+            size="sm"
+            variant={openVoorSollicitaties ? 'danger' : 'primary'}
+            loading={deurBezig}
+            onClick={() => zetDeur(!openVoorSollicitaties)}
+          >
+            {openVoorSollicitaties ? 'Sluiten' : 'Openen'}
+          </Button>
+        </div>
+      </div>
 
       <div className="mt-6 space-y-3 border-t border-line pt-5">
         <div>

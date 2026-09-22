@@ -2,7 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayApply } from '@/lib/access';
-import { applicationSchema, notifyDiscord, saveApplication } from '@/lib/applications';
+import {
+  applicationSchema,
+  notifyDiscord,
+  onthoudDiscordBericht,
+  saveApplication,
+} from '@/lib/applications';
+import { getRegistryData } from '@/lib/data';
 
 /** De velden zoals ze zijn ingetypt, ruw. */
 export type ApplicationValues = Record<
@@ -54,6 +60,18 @@ export async function submitApplicationAction(
     return { ok: false, error: 'Log eerst in met Discord.', values };
   }
 
+  // De deur kan dicht staan omdat de familie vol zit. Ook dat wordt hier
+  // gecontroleerd en niet alleen in de pagina: het formulier posten kan
+  // iedereen die het adres kent.
+  const { settings } = await getRegistryData();
+  if (!settings.applicationsOpen) {
+    return {
+      ok: false,
+      error: 'De sollicitaties zijn op dit moment gesloten.',
+      values,
+    };
+  }
+
   if (access.discordUnavailable) {
     return {
       ok: false,
@@ -95,8 +113,13 @@ export async function submitApplicationAction(
     return { ok: false, error: opgeslagen.error, values };
   }
 
-  // De melding in Discord mag de inzending nooit laten mislukken.
-  await notifyDiscord(parsed.data, access);
+  // De melding in Discord mag de inzending nooit laten mislukken. Het
+  // bericht-ID onthouden we wel, zodat het bericht later weer uit het kanaal
+  // kan verdwijnen als de Lead de sollicitatie archiveert.
+  const messageId = await notifyDiscord(parsed.data, access);
+  if (messageId) {
+    await onthoudDiscordBericht(opgeslagen.id, messageId, null);
+  }
 
   /*
    * Bewust géén revalidatePath('/solliciteren'): die liet de pagina opnieuw

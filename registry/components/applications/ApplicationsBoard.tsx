@@ -63,7 +63,14 @@ const STATUS: Record<
   },
 };
 
-export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
+export function ApplicationsBoard({
+  compact = false,
+  archief = false,
+}: {
+  compact?: boolean;
+  /** Toont de gearchiveerde sollicitaties in plaats van de openstaande. */
+  archief?: boolean;
+}) {
   const { toast } = useToast();
   const [rows, setRows] = useState<ApplicationRow[] | null>(null);
   const [votes, setVotes] = useState<Record<string, VoteTally>>({});
@@ -72,7 +79,9 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
 
   const haalOp = useCallback(async (): Promise<Payload> => {
     try {
-      const response = await fetch('/api/applications', { cache: 'no-store' });
+      const response = await fetch(`/api/applications${archief ? '?archief=1' : ''}`, {
+        cache: 'no-store',
+      });
       const payload = (await response.json()) as Payload;
 
       if (!response.ok) {
@@ -84,7 +93,7 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
       toast('Kon de sollicitaties niet ophalen.', 'error');
       return { applications: [] };
     }
-  }, [toast]);
+  }, [toast, archief]);
 
   const verwerk = useCallback((payload: Payload) => {
     setRows(payload.applications ?? []);
@@ -140,7 +149,7 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
       const response = await fetch('/api/applications', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ action: 'status', id, status }),
       });
 
       if (!response.ok) {
@@ -158,6 +167,44 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
     }
   }
 
+  /** Stemming openen of sluiten. */
+  async function zetStemming(id: string, closed: boolean) {
+    await stuur(
+      id,
+      { action: 'voting', id, closed },
+      closed ? 'Stemming gesloten.' : 'Stemming weer open.',
+    );
+  }
+
+  /** Naar het archief. De berichten in Discord gaan mee weg. */
+  async function archiveer(id: string) {
+    await stuur(id, { action: 'archive', id }, 'Naar het archief verplaatst.');
+  }
+
+  async function stuur(id: string, body: unknown, melding: string) {
+    setBusy(id);
+    try {
+      const response = await fetch('/api/applications', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        toast(payload.error ?? 'Actie mislukt.', 'error');
+        return;
+      }
+
+      toast(melding, 'success');
+      verwerk(await haalOp());
+    } catch {
+      toast('Actie mislukt.', 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (rows === null) {
     return <p className="py-10 text-center text-sm text-muted">Bezig met laden…</p>;
   }
@@ -165,9 +212,13 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-panel px-5 py-10 text-center">
-        <p className="text-sm text-ink/80">Er staan op dit moment geen sollicitaties open.</p>
+        <p className="text-sm text-ink/80">
+          {archief ? 'Het archief is nog leeg.' : 'Er staan op dit moment geen sollicitaties open.'}
+        </p>
         <p className="mt-1.5 text-xs text-muted">
-          Zodra iemand het formulier invult, verschijnt hij hier.
+          {archief
+            ? 'Wat je archiveert komt hier te staan, met de stemmen erbij.'
+            : 'Zodra iemand het formulier invult, verschijnt hij hier.'}
         </p>
       </div>
     );
@@ -185,6 +236,8 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
           geblokkeerd={busy !== null}
           onStem={(keuze) => stem(row.id, keuze)}
           onStatus={(status) => zetStatus(row.id, status)}
+          onStemming={(closed) => zetStemming(row.id, closed)}
+          onArchiveer={() => archiveer(row.id)}
         />
       ))}
     </ul>
@@ -200,6 +253,8 @@ export interface ApplicationCardProps {
   geblokkeerd: boolean;
   onStem: (keuze: 'ja' | 'nee') => void;
   onStatus: (status: string) => void;
+  onStemming: (closed: boolean) => void;
+  onArchiveer: () => void;
 }
 
 /**
@@ -217,172 +272,217 @@ export function ApplicationCard({
   geblokkeerd,
   onStem,
   onStatus,
+  onStemming,
+  onArchiveer,
 }: ApplicationCardProps) {
   const status = STATUS[row.status] ?? STATUS['nieuw']!;
-  const besloten = row.status === 'aangenomen' || row.status === 'afgewezen';
+  const gearchiveerd = row.archived_at !== null;
+  // Stemmen kan alleen zolang er nog iets te beslissen valt.
+  const stemmenDicht =
+    gearchiveerd || row.voting_closed || row.status === 'aangenomen' || row.status === 'afgewezen';
 
   return (
-<li
-  key={row.id}
-  className="relative overflow-hidden rounded-xl border border-line bg-panel"
->
-  {/* Het streepje links draagt de statuskleur over de hele kaart. */}
-  <span
-    aria-hidden
-    className={`absolute inset-y-0 left-0 w-1 ${status.rand}`}
-  />
+    <li key={row.id} className="relative overflow-hidden rounded-xl border border-line bg-panel">
+      {/* Het streepje links draagt de statuskleur over de hele kaart. */}
+      <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${status.rand}`} />
 
-  {/* ---------- Kop ----------
+      {/* ---------- Kop ----------
 
       Naam, status en de stand stonden op één regel naast elkaar.
       Op een telefoon brak dat in vier stukken. Nu staat elk ding
       op zijn eigen regel, in volgorde van belangrijkheid. */}
-  <div className={`border-b border-line-soft px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6 ${status.vlak}`}>
-    <div className="flex items-center gap-3">
-      {row.avatar_url ? (
-        <Image
-          src={row.avatar_url}
-          alt=""
-          width={40}
-          height={40}
-          className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-line"
-        />
-      ) : (
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-panel-hover text-xs font-medium text-muted ring-1 ring-line">
-          {row.name.slice(0, 2).toUpperCase()}
-        </span>
-      )}
+      <div
+        className={`border-b border-line-soft px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6 ${status.vlak}`}
+      >
+        <div className="flex items-center gap-3">
+          {row.avatar_url ? (
+            <Image
+              src={row.avatar_url}
+              alt=""
+              width={40}
+              height={40}
+              className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-line"
+            />
+          ) : (
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-panel-hover text-xs font-medium text-muted ring-1 ring-line">
+              {row.name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-display text-[17px] leading-tight tracking-wide text-creme">
-          {row.name}
-        </p>
-        {row.discord_username ? (
-          <p className="truncate text-xs text-muted">@{row.discord_username}</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-[17px] leading-tight tracking-wide text-creme">
+              {row.name}
+            </p>
+            {row.discord_username ? (
+              <p className="truncate text-xs text-muted">@{row.discord_username}</p>
+            ) : null}
+          </div>
+
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] ${status.pil}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${status.stip}`} aria-hidden />
+            {status.label}
+          </span>
+        </div>
+
+        {/* Losse feiten op één regel, met de stand er tegenover. */}
+        <div className="mt-2.5 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-[11px] text-muted-soft">
+            {/* "22-09-2026, 18:06" werd op een telefoon afgekapt tot "18:...".
+            "2 uur geleden" past wel, en zegt bij een sollicitatie meer. */}
+            {[row.age ? `${row.age} jaar` : null, row.phone, relativeTime(row.created_at)]
+              .filter(Boolean)
+              .join('  ·  ')}
+          </p>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Teller icoon="check" aantal={stand.ja} toon="groen" />
+            <Teller icoon="cross" aantal={stand.nee} toon="rood" />
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- Inhoud ---------- */}
+      <div className="space-y-3 px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6">
+        <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
+        {row.experience || row.availability ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Veld label="Ervaring in FiveM" waarde={row.experience} />
+            <Veld label="Wanneer online" waarde={row.availability} />
+          </div>
         ) : null}
       </div>
 
-      <span
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] ${status.pil}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${status.stip}`} aria-hidden />
-        {status.label}
-      </span>
-    </div>
+      {/* ---------- Stemmen ----------
 
-    {/* Losse feiten op één regel, met de stand er tegenover. */}
-    <div className="mt-2.5 flex items-center justify-between gap-3">
-      <p className="min-w-0 truncate text-[11px] text-muted-soft">
-        {/* "22-09-2026, 18:06" werd op een telefoon afgekapt tot "18:...".
-            "2 uur geleden" past wel, en zegt bij een sollicitatie meer. */}
-        {[row.age ? `${row.age} jaar` : null, row.phone, relativeTime(row.created_at)]
-          .filter(Boolean)
-          .join('  ·  ')}
-      </p>
+      Op een gesloten, afgehandelde of gearchiveerde sollicitatie valt
+      niets meer te stemmen. De stand blijft staan als verantwoording
+      van het besluit, maar de knoppen verdwijnen. */}
+      {stemmenDicht ? (
+        row.voting_closed && !gearchiveerd ? (
+          <div className="border-t border-line-soft px-3.5 py-2.5 pl-5 sm:px-5 sm:pl-6">
+            <p className="text-[11px] text-muted-soft">
+              De stemming is gesloten. De stand hierboven blijft staan.
+            </p>
+          </div>
+        ) : null
+      ) : (
+        <div className="border-t border-line-soft px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
+              Jouw stem
+            </span>
 
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Teller icoon="check" aantal={stand.ja} toon="groen" />
-        <Teller icoon="cross" aantal={stand.nee} toon="rood" />
-      </div>
-    </div>
-  </div>
+            <StemKnop
+              actief={stand.mine === 'ja'}
+              toon="groen"
+              disabled={bezig}
+              onClick={() => onStem('ja')}
+              label="Voor"
+            />
+            <StemKnop
+              actief={stand.mine === 'nee'}
+              toon="rood"
+              disabled={bezig}
+              onClick={() => onStem('nee')}
+              label="Tegen"
+            />
+          </div>
 
-  {/* ---------- Inhoud ---------- */}
-  <div className="space-y-3 px-3.5 py-3.5 pl-5 sm:px-5 sm:pl-6">
-    <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
-    {row.experience || row.availability ? (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Veld label="Ervaring in FiveM" waarde={row.experience} />
-        <Veld label="Wanneer online" waarde={row.availability} />
-      </div>
-    ) : null}
-  </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-soft">
+            {stand.mine
+              ? 'Nog een keer op dezelfde knop klikken trekt je stem in.'
+              : 'Je stem is advies — de Lead neemt het besluit.'}
+          </p>
+        </div>
+      )}
 
-  {/* ---------- Stemmen ----------
+      {/* ---------- Beslissen (alleen Lead) ---------- */}
+      {isAdmin ? (
+        <div className="border-t border-line-soft bg-panel-high px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
+          {row.handled_by ? (
+            <p className="mb-2.5 text-[11px] text-muted-soft">
+              Laatst behandeld door {row.handled_by}
+              {row.handled_at ? ` op ${formatDateTime(row.handled_at)}` : ''}.
+            </p>
+          ) : null}
 
-      Op een afgehandelde sollicitatie valt niets meer te stemmen.
-      De stand blijft staan als verantwoording van het besluit, maar
-      de knoppen verdwijnen. */}
-  {besloten ? null : (
-    <div className="border-t border-line-soft px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
-          Jouw stem
-        </span>
-
-        <StemKnop
-          actief={stand.mine === 'ja'}
-          toon="groen"
-          disabled={bezig}
-          onClick={() => onStem('ja')}
-          label="Voor"
-        />
-        <StemKnop
-          actief={stand.mine === 'nee'}
-          toon="rood"
-          disabled={bezig}
-          onClick={() => onStem('nee')}
-          label="Tegen"
-        />
-      </div>
-
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-soft">
-        {stand.mine
-          ? 'Nog een keer op dezelfde knop klikken trekt je stem in.'
-          : 'Je stem is advies — de Lead neemt het besluit.'}
-      </p>
-    </div>
-  )}
-
-  {/* ---------- Beslissen (alleen Lead) ---------- */}
-  {isAdmin ? (
-    <div className="border-t border-line-soft bg-panel-high px-3.5 py-3 pl-5 sm:px-5 sm:pl-6">
-      {row.handled_by ? (
-        <p className="mb-2.5 text-[11px] text-muted-soft">
-          Laatst behandeld door {row.handled_by}
-          {row.handled_at ? ` op ${formatDateTime(row.handled_at)}` : ''}.
-        </p>
-      ) : null}
-
-      {/* De twee besluiten naast elkaar, "in behandeling" eronder
+          {gearchiveerd ? (
+            <p className="text-[11px] text-muted-soft">
+              Gearchiveerd door {row.archived_by ?? 'een Lead'}
+              {row.archived_at ? ` op ${formatDateTime(row.archived_at)}` : ''}. De berichten in
+              Discord zijn opgeruimd.
+            </p>
+          ) : (
+            <>
+              {/* De twee besluiten naast elkaar, "in behandeling" eronder
           over de volle breedte. Drie knoppen op een rij worden op
           een telefoon onleesbaar smal. */}
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <Button
-          type="button"
-          size="sm"
-          variant="primary"
-          loading={bezig}
-          disabled={geblokkeerd || row.status === 'aangenomen'}
-          onClick={() => onStatus('aangenomen')}
-        >
-          Aannemen
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="danger"
-          disabled={geblokkeerd || row.status === 'afgewezen'}
-          onClick={() => onStatus('afgewezen')}
-        >
-          Afwijzen
-        </Button>
-        <span className="col-span-2 sm:col-auto">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="w-full sm:w-auto"
-            disabled={geblokkeerd || row.status === 'in_behandeling'}
-            onClick={() => onStatus('in_behandeling')}
-          >
-            In behandeling
-          </Button>
-        </span>
-      </div>
-    </div>
-  ) : null}
-</li>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primary"
+                  loading={bezig}
+                  disabled={geblokkeerd || row.status === 'aangenomen'}
+                  onClick={() => onStatus('aangenomen')}
+                >
+                  Aannemen
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="danger"
+                  disabled={geblokkeerd || row.status === 'afgewezen'}
+                  onClick={() => onStatus('afgewezen')}
+                >
+                  Afwijzen
+                </Button>
+                <span className="col-span-2 sm:col-auto">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="w-full sm:w-auto"
+                    disabled={geblokkeerd || row.status === 'in_behandeling'}
+                    onClick={() => onStatus('in_behandeling')}
+                  >
+                    In behandeling
+                  </Button>
+                </span>
+              </div>
+
+              {/* Sluiten en archiveren staan los van het besluit: het zijn geen
+          oordelen over de persoon maar opruimacties. */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-2.5">
+                <button
+                  type="button"
+                  disabled={geblokkeerd}
+                  onClick={() => onStemming(!row.voting_closed)}
+                  className="tap-target inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-[11px] uppercase tracking-[0.1em] text-muted transition-colors hover:border-creme/25 hover:text-ink disabled:opacity-55"
+                >
+                  {row.voting_closed ? 'Stemming heropenen' : 'Stemming sluiten'}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={geblokkeerd}
+                  onClick={onArchiveer}
+                  className="tap-target inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-[11px] uppercase tracking-[0.1em] text-muted transition-colors hover:border-sondravo-red/40 hover:text-[#f2a9ac] disabled:opacity-55"
+                >
+                  Archiveren
+                </button>
+
+                <span className="text-[11px] text-muted-soft">
+                  Archiveren haalt ook de berichten uit Discord weg.
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+    </li>
   );
 }
 

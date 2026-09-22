@@ -2,7 +2,7 @@
 
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { ApplicationsBoard } from '@/components/applications/ApplicationsBoard';
+import { ApplicationsPanel } from '@/components/applications/ApplicationsPanel';
 
 interface ApplicationsDialogProps {
   open: boolean;
@@ -33,7 +33,7 @@ export function ApplicationsDialog({ open, onClose }: ApplicationsDialogProps) {
         </div>
       }
     >
-      <ApplicationsBoard compact />
+      <ApplicationsPanel isAdmin />
     </Modal>
   );
 }
