@@ -29,17 +29,17 @@ const STATUS_TEKST: Record<string, { kop: string; uitleg: string; toon: string }
   nieuw: {
     kop: 'Je sollicitatie staat open',
     uitleg:
-      'Hij is binnen en de familie kijkt ernaar. Je hoort het via Discord zodra er een besluit is.',
+      'Hij is binnen en de familie kijkt ernaar. We nemen ingame contact met je op zodra er een besluit is.',
     toon: 'border-sondravo-green/40 bg-sondravo-green/10',
   },
   in_behandeling: {
     kop: 'Je sollicitatie wordt bekeken',
-    uitleg: 'Een Lead is ermee bezig. Je hoort het via Discord zodra er een besluit is.',
+    uitleg: 'Een Lead is ermee bezig. We nemen ingame contact met je op zodra er een besluit is.',
     toon: 'border-creme/30 bg-creme/5',
   },
   aangenomen: {
     kop: 'Je bent aangenomen',
-    uitleg: 'Welkom bij de familie. Een Lead neemt contact met je op in Discord.',
+    uitleg: 'Welkom bij de familie. Een Lead zoekt je ingame op.',
     toon: 'border-sondravo-green/40 bg-sondravo-green/10',
   },
   afgewezen: {

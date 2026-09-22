@@ -71,7 +71,7 @@ export function ApplicationForm() {
         name="phone"
         maxLength={32}
         inputMode="tel"
-        hint="Optioneel, maar handig als we je willen bereiken."
+        hint="Je nummer in de stad — daar bellen we je op. Zonder nummer kunnen we je ingame niet bereiken."
         defaultValue={values?.phone ?? ''}
         error={errors['phone']}
       />
