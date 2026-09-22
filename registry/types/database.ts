@@ -22,6 +22,7 @@ export interface Database {
           label: string;
           glyph: string;
           tone: RankTone;
+          color: string;
           sort_order: number;
           created_at: string;
         };
@@ -30,6 +31,7 @@ export interface Database {
           label: string;
           glyph?: string;
           tone?: RankTone;
+          color?: string;
           sort_order: number;
           created_at?: string;
         };

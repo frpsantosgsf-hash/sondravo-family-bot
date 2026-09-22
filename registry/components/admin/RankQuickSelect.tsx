@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { toneStyle } from '@/lib/ranks';
+import { rankAccent } from '@/lib/ranks';
 import { Spinner } from '@/components/ui/Button';
 import type { Rank, RegistryMember } from '@/types';
 
@@ -18,7 +18,7 @@ interface RankQuickSelectProps {
  */
 export function RankQuickSelect({ member, rank, ranks, onChange }: RankQuickSelectProps) {
   const [pending, setPending] = useState(false);
-  const tone = toneStyle(rank.tone);
+  const accent = rankAccent(rank.color);
 
   async function handleChange(value: string) {
     if (value === member.rank) return;
@@ -32,7 +32,8 @@ export function RankQuickSelect({ member, rank, ranks, onChange }: RankQuickSele
 
   return (
     <span
-      className={`relative inline-flex items-center rounded-full border transition-colors ${tone.badge} ${
+      style={accent.badge}
+      className={`relative inline-flex items-center rounded-full border transition-[filter,opacity] ${
         pending ? 'opacity-60' : 'hover:brightness-125'
       }`}
     >

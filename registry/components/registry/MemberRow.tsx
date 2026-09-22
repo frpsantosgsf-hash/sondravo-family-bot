@@ -3,7 +3,7 @@
 import { Avatar } from '@/components/registry/Avatar';
 import { RankBadge } from '@/components/registry/RankBadge';
 import { RankQuickSelect } from '@/components/admin/RankQuickSelect';
-import { toneStyle } from '@/lib/ranks';
+import { rankAccent } from '@/lib/ranks';
 import { displayName, formatDiscordHandle, formatPhone } from '@/lib/format';
 import type { Rank, RegistryMember } from '@/types';
 
@@ -32,14 +32,14 @@ export function MemberRow({
   onDelete,
   onRankChange,
 }: MemberRowProps) {
-  const tone = toneStyle(rank.tone);
+  const accent = rankAccent(rank.color);
   const handle = formatDiscordHandle(member.discordUsername);
   const phone = formatPhone(member.phone);
   const isAdmin = Boolean(onEdit && onDelete);
 
   return (
     <li className="group relative flex items-center gap-3 px-3 py-3 transition-colors duration-150 hover:bg-panel-hover/60 sm:gap-4 sm:px-4">
-      <Avatar name={member.name} src={member.avatarUrl} ring={tone.ring} />
+      <Avatar name={member.name} src={member.avatarUrl} ring={accent.ring} />
 
       {/* Naam + Discord */}
       <div className="min-w-0 flex-1">

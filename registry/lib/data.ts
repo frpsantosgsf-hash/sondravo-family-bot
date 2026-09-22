@@ -26,6 +26,7 @@ function toRank(row: RankRow): Rank {
     label: row.label,
     glyph: row.glyph,
     tone: row.tone,
+    color: row.color,
     sortOrder: row.sort_order,
   };
 }

@@ -27,6 +27,8 @@ export interface Rank {
   label: string;
   glyph: string;
   tone: RankTone;
+  /** De kleur van de Discord-rol, als hex. De UI dempt hem zelf. */
+  color: string;
   sortOrder: number;
 }
 

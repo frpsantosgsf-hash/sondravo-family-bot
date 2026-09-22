@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Image from 'next/image';
 import { avatarSeed, initials } from '@/lib/format';
 
 interface AvatarProps {
   name: string;
   src: string | null;
-  /** Ring-klasse die bij de rang hoort. */
-  ring: string;
+  /** Randje in de kleur van de rang. */
+  ring: CSSProperties;
   size?: 'sm' | 'md';
 }
 
@@ -30,7 +30,8 @@ export function Avatar({ name, src, ring, size = 'md' }: AvatarProps) {
         width={dimension}
         height={dimension}
         onError={() => setFailed(true)}
-        className={`${boxClass} shrink-0 rounded-full object-cover ring-1 ${ring}`}
+        style={ring}
+        className={`${boxClass} shrink-0 rounded-full object-cover`}
       />
     );
   }
@@ -42,8 +43,9 @@ export function Avatar({ name, src, ring, size = 'md' }: AvatarProps) {
   return (
     <span
       aria-hidden
-      className={`${boxClass} flex shrink-0 items-center justify-center rounded-full font-display text-[13px] font-semibold tracking-wide ring-1 ${ring}`}
+      className={`${boxClass} flex shrink-0 items-center justify-center rounded-full font-display text-[13px] font-semibold tracking-wide`}
       style={{
+        ...ring,
         background: `linear-gradient(145deg, hsl(100 4% ${depth + 4}%), hsl(100 5% ${depth - 3}%))`,
         color: 'rgba(241, 232, 207, 0.82)',
       }}

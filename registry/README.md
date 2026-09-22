@@ -38,7 +38,8 @@ iets wijzigen.
 
 ### Ledenlijst (`/leden`) — publiek, zonder account
 - Alle leden, automatisch gegroepeerd per rang
-- Rangen in vaste volgorde (nooit alfabetisch)
+- Rangen in vaste volgorde (nooit alfabetisch), elk in de kleur van zijn
+  Discord-rol — gedempt, zodat de lijst rustig blijft
 - Lege rangen zijn verborgen en verschijnen automatisch zodra er iemand in komt
 - Discord-naam, avatar (of nette initialen), ingame telefoonnummer
 - Realtime zoeken op naam, Discord of rang + filter per rang
@@ -81,7 +82,7 @@ registry/
 │   ├── discord.ts               Discord API (server-only)
 │   └── video.ts                 YouTube/bestand-herkenning voor de clip
 ├── supabase/
-│   ├── migrations/              4 SQL-bestanden, in volgorde uitvoeren
+│   ├── migrations/              5 SQL-bestanden, in volgorde uitvoeren
 │   ├── verify_rls.sql           Controlescript voor de beveiliging
 │   └── README.md
 ├── types/                       Database- en app-types
@@ -109,8 +110,9 @@ uit. Plak de inhoud, klik **Run**, en ga pas daarna naar het volgende bestand.
 | 2 | `supabase/migrations/0002_rls_policies.sql` | Row Level Security, rechten, admin-RPC's |
 | 3 | `supabase/migrations/0003_seed.sql` | De 9 rangen + onze 20 leden + capaciteit 20 |
 | 4 | `supabase/migrations/0004_bot_bridge.sql` | Koppeling voor `/new` in Discord |
+| 5 | `supabase/migrations/0005_rank_colors.sql` | De kleur van elke Discord-rol |
 
-Alle vier zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
+Alle vijf zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
 
 ### 3. Discord Developer Application maken
 Ga naar [discord.com/developers/applications](https://discord.com/developers/applications)
@@ -354,6 +356,44 @@ NEXT_PUBLIC_HERO_CLIP_START=12
 
 ---
 
+## Rangkleuren
+
+Elke rang heeft de kleur van zijn Discord-rol. Die staan in de database, in
+`public.ranks.color`:
+
+| Rang | Kleur |
+|------|-------|
+| Mpitarika | `#1e00ff` blauw |
+| Lefitra | `#b7ff00` lime |
+| Mpanoro | `#00f52d` groen |
+| Mpifehy | `#00f52d` groen |
+| Hery | `#2ecc71` emerald |
+| Mpiady | `#ddf80c` geel-lime |
+| Zoky | `#f1c40f` goud |
+| Mpikambana | `#ff0000` rood |
+| Zazavao | `#ff0000` rood |
+
+De site toont ze **niet** zo fel als Discord. Van elke kleur blijft de kleurtoon
+staan — dat maakt de rang herkenbaar — maar verzadiging en helderheid worden
+naar een vast bereik getrokken. Zonder die stap zou het blauw van Mpitarika
+(bijna zwart van zichzelf) veel donkerder ogen dan het goud van Zoky en zou de
+lijst ongelijk aanvoelen. Nu heeft elke rangkop dezelfde leesbaarheid.
+
+Verandert een rolkleur in Discord? Dan pas je één regel aan:
+
+```sql
+update public.ranks set color = '#1e00ff' where key = 'mpitarika';
+```
+
+De site neemt dat direct over; er hoeft niets opnieuw gedeployed te worden.
+
+> De emoji's uit Discord (👑 ⚜️ ⚔️ 🩸) zijn bewust **niet** overgenomen. Die
+> maken de lijst druk. In plaats daarvan staan er rustige tekens (♛ ✦ ◆ ◈ ● ○)
+> in de kleur van de rang. Wil je de emoji's er toch bij, dan is dat één
+> update op `public.ranks.glyph`.
+
+---
+
 ## Beveiliging
 
 De rechten staan in de **database**, niet in de knoppen. Een knop verbergen is
@@ -423,7 +463,7 @@ Alles wat code is, is klaar. Dit kan ik niet voor je doen omdat er accounts en
 geheimen bij komen kijken:
 
 - [ ] Supabase-project aanmaken (stap 1)
-- [ ] De vier SQL-bestanden draaien (stap 2)
+- [ ] De vijf SQL-bestanden draaien (stap 2)
 - [ ] Discord Developer Application aanmaken + redirect URL (stap 3 en 4)
 - [ ] Discord-provider in Supabase aanzetten (stap 5)
 - [ ] Eén keer inloggen en jezelf in `admins` zetten (stap 7 t/m 9)

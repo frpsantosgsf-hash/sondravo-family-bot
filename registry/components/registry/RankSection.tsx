@@ -1,7 +1,7 @@
 'use client';
 
 import { MemberRow } from '@/components/registry/MemberRow';
-import { toneStyle } from '@/lib/ranks';
+import { rankAccent } from '@/lib/ranks';
 import type { Rank, RegistryMember } from '@/types';
 
 interface RankSectionProps {
@@ -25,21 +25,22 @@ export function RankSection({
   onDelete,
   onRankChange,
 }: RankSectionProps) {
-  const tone = toneStyle(rank.tone);
+  const accent = rankAccent(rank.color);
 
   return (
     <section aria-labelledby={`rang-${rank.key}`} className="animate-fade-up">
       <div className="mb-2.5 flex items-center gap-3 px-1">
         <h3
           id={`rang-${rank.key}`}
-          className={`flex items-center gap-2 font-display text-[13px] font-semibold uppercase tracking-[0.2em] ${tone.heading}`}
+          style={accent.heading}
+          className="flex items-center gap-2 font-display text-[13px] font-semibold uppercase tracking-[0.2em]"
         >
           <span aria-hidden className="text-sm leading-none">
             {rank.glyph}
           </span>
           {rank.label}
         </h3>
-        <div className={`h-px flex-1 bg-gradient-to-r ${tone.rule}`} aria-hidden />
+        <div className="h-px flex-1" style={accent.rule} aria-hidden />
         <span className="font-display text-[13px] tabular-nums text-muted">{members.length}</span>
       </div>
 
