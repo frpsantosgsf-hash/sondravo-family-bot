@@ -25,8 +25,9 @@ export function ApplicationForm() {
         <p className="text-[13px] font-medium uppercase tracking-[0.16em] text-creme">Verstuurd</p>
         <p className="mt-2 text-sm leading-relaxed text-ink/80">{state.message}</p>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Je hoort het via Discord. Je hoeft niets meer te doen — nog een keer insturen kan pas
-          nadat er naar deze sollicitatie gekeken is.
+          We nemen <strong className="text-ink/80">ingame</strong> contact met je op, op het
+          telefoonnummer dat je hebt opgegeven. Je hoeft verder niets te doen — nog een keer
+          insturen kan pas nadat er naar deze sollicitatie gekeken is.
         </p>
       </div>
     );

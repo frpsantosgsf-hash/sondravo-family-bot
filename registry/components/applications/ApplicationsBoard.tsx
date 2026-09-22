@@ -75,9 +75,19 @@ export function ApplicationsBoard({
   const [rows, setRows] = useState<ApplicationRow[] | null>(null);
   const [votes, setVotes] = useState<Record<string, VoteTally>>({});
   const [isAdmin, setIsAdmin] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
+  type Actie = 'aannemen' | 'afwijzen' | 'behandeling' | 'stemming' | 'archief' | 'stem';
+  const [busy, setBusy] = useState<{ id: string; actie: Actie } | null>(null);
 
-  const haalOp = useCallback(async (): Promise<Payload> => {
+  /**
+   * Haalt de lijst op, of null als dat niet lukte.
+   *
+   * Bewust null en geen lege lijst: een lege lijst betekent "er is niets", en
+   * dat is iets heel anders dan "ik weet het even niet". Gaf dit bij een fout
+   * een lege lijst terug, dan las het scherm na een haperende verversing
+   * "geen sollicitaties open" terwijl ze er gewoon staan — en verdwenen alle
+   * beheerknoppen omdat isAdmin op false sprong.
+   */
+  const haalOp = useCallback(async (): Promise<Payload | null> => {
     try {
       const response = await fetch(`/api/applications${archief ? '?archief=1' : ''}`, {
         cache: 'no-store',
@@ -86,16 +96,18 @@ export function ApplicationsBoard({
 
       if (!response.ok) {
         toast(payload.error ?? 'Kon de sollicitaties niet ophalen.', 'error');
-        return { applications: [] };
+        return null;
       }
       return payload;
     } catch {
       toast('Kon de sollicitaties niet ophalen.', 'error');
-      return { applications: [] };
+      return null;
     }
   }, [toast, archief]);
 
-  const verwerk = useCallback((payload: Payload) => {
+  /** Laat bij een mislukte ophaalactie staan wat er stond. */
+  const verwerk = useCallback((payload: Payload | null) => {
+    if (!payload) return;
     setRows(payload.applications ?? []);
     setVotes(payload.votes ?? {});
     setIsAdmin(payload.isAdmin === true);
@@ -106,7 +118,10 @@ export function ApplicationsBoard({
 
     void (async () => {
       const payload = await haalOp();
-      if (!cancelled) verwerk(payload);
+      if (cancelled) return;
+      // Bij de eerste keer moet het scherm hoe dan ook uit "bezig met laden"
+      // komen, ook als het ophalen mislukte.
+      verwerk(payload ?? { applications: [] });
     })();
 
     return () => {
@@ -121,7 +136,7 @@ export function ApplicationsBoard({
     const huidig = votes[id]?.mine ?? null;
     const nieuw = huidig === keuze ? null : keuze;
 
-    setBusy(id);
+    setBusy({ id, actie: 'stem' });
     try {
       const response = await fetch('/api/applications/vote', {
         method: 'POST',
@@ -143,8 +158,8 @@ export function ApplicationsBoard({
     }
   }
 
-  async function zetStatus(id: string, status: string) {
-    setBusy(id);
+  async function zetStatus(id: string, status: string, actie: Actie) {
+    setBusy({ id, actie });
     try {
       const response = await fetch('/api/applications', {
         method: 'PATCH',
@@ -171,6 +186,7 @@ export function ApplicationsBoard({
   async function zetStemming(id: string, closed: boolean) {
     await stuur(
       id,
+      'stemming',
       { action: 'voting', id, closed },
       closed ? 'Stemming gesloten.' : 'Stemming weer open.',
     );
@@ -178,11 +194,11 @@ export function ApplicationsBoard({
 
   /** Naar het archief. De berichten in Discord gaan mee weg. */
   async function archiveer(id: string) {
-    await stuur(id, { action: 'archive', id }, 'Naar het archief verplaatst.');
+    await stuur(id, 'archief', { action: 'archive', id }, 'Naar het archief verplaatst.');
   }
 
-  async function stuur(id: string, body: unknown, melding: string) {
-    setBusy(id);
+  async function stuur(id: string, actie: Actie, body: unknown, melding: string) {
+    setBusy({ id, actie });
     try {
       const response = await fetch('/api/applications', {
         method: 'PATCH',
@@ -232,10 +248,10 @@ export function ApplicationsBoard({
           row={row}
           stand={votes[row.id] ?? { ja: 0, nee: 0, mine: null }}
           isAdmin={isAdmin}
-          bezig={busy === row.id}
+          bezig={busy?.id === row.id ? busy.actie : null}
           geblokkeerd={busy !== null}
           onStem={(keuze) => stem(row.id, keuze)}
-          onStatus={(status) => zetStatus(row.id, status)}
+          onStatus={(status, actie) => zetStatus(row.id, status, actie)}
           onStemming={(closed) => zetStemming(row.id, closed)}
           onArchiveer={() => archiveer(row.id)}
         />
@@ -248,11 +264,12 @@ export interface ApplicationCardProps {
   row: ApplicationRow;
   stand: VoteTally;
   isAdmin: boolean;
-  bezig: boolean;
+  /** Welke actie op deze kaart loopt, zodat de spinner op de juiste knop staat. */
+  bezig: 'aannemen' | 'afwijzen' | 'behandeling' | 'stemming' | 'archief' | 'stem' | null;
   /** Uitgeschakeld wanneer er elders al een actie loopt. */
   geblokkeerd: boolean;
   onStem: (keuze: 'ja' | 'nee') => void;
-  onStatus: (status: string) => void;
+  onStatus: (status: string, actie: 'aannemen' | 'afwijzen' | 'behandeling') => void;
   onStemming: (closed: boolean) => void;
   onArchiveer: () => void;
 }
@@ -310,12 +327,11 @@ export function ApplicationCard({
           )}
 
           <div className="min-w-0 flex-1">
+            {/* De @naam staat als eigen regel in de feitenlijst hieronder;
+                twee keer hetzelfde kost een regel zonder iets toe te voegen. */}
             <p className="truncate font-display text-[17px] leading-tight tracking-wide text-creme">
               {row.name}
             </p>
-            {row.discord_username ? (
-              <p className="truncate text-xs text-muted">@{row.discord_username}</p>
-            ) : null}
           </div>
 
           <span
@@ -380,14 +396,14 @@ export function ApplicationCard({
             <StemKnop
               actief={stand.mine === 'ja'}
               toon="groen"
-              disabled={bezig}
+              disabled={bezig !== null}
               onClick={() => onStem('ja')}
               label="Voor"
             />
             <StemKnop
               actief={stand.mine === 'nee'}
               toon="rood"
-              disabled={bezig}
+              disabled={bezig !== null}
               onClick={() => onStem('nee')}
               label="Tegen"
             />
@@ -427,9 +443,9 @@ export function ApplicationCard({
                   type="button"
                   size="sm"
                   variant="primary"
-                  loading={bezig}
+                  loading={bezig === 'aannemen'}
                   disabled={geblokkeerd || row.status === 'aangenomen'}
-                  onClick={() => onStatus('aangenomen')}
+                  onClick={() => onStatus('aangenomen', 'aannemen')}
                 >
                   Aannemen
                 </Button>
@@ -437,8 +453,9 @@ export function ApplicationCard({
                   type="button"
                   size="sm"
                   variant="danger"
+                  loading={bezig === 'afwijzen'}
                   disabled={geblokkeerd || row.status === 'afgewezen'}
-                  onClick={() => onStatus('afgewezen')}
+                  onClick={() => onStatus('afgewezen', 'afwijzen')}
                 >
                   Afwijzen
                 </Button>
@@ -448,8 +465,9 @@ export function ApplicationCard({
                     size="sm"
                     variant="secondary"
                     className="w-full sm:w-auto"
+                    loading={bezig === 'behandeling'}
                     disabled={geblokkeerd || row.status === 'in_behandeling'}
-                    onClick={() => onStatus('in_behandeling')}
+                    onClick={() => onStatus('in_behandeling', 'behandeling')}
                   >
                     In behandeling
                   </Button>

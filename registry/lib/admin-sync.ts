@@ -28,9 +28,23 @@ export async function syncAdminFromDiscord(
   const supabase = createAdminClient();
 
   if (check.status === 'admin') {
-    await supabase
+    /*
+     * Bestaat de rij al, dan blijven we eraf. Een upsert met source:'discord'
+     * zou een handmatig toegevoegde admin omzetten naar een door Discord
+     * beheerde rij — en die wordt hieronder verwijderd zodra de rol wegvalt.
+     * Dat is precies de noodsleutel die nooit mag wegvallen: niemand kan hem
+     * daarna vanuit de site terugzetten, want schrijven op admins is voor
+     * iedereen ingetrokken.
+     */
+    const { data: bestaand } = await supabase
       .from('admins')
-      .upsert({ user_id: supabaseUserId, source: 'discord' }, { onConflict: 'user_id' });
+      .select('user_id')
+      .eq('user_id', supabaseUserId)
+      .maybeSingle();
+
+    if (!bestaand) {
+      await supabase.from('admins').insert({ user_id: supabaseUserId, source: 'discord' });
+    }
     return;
   }
 

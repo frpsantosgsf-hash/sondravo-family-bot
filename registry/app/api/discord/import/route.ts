@@ -12,9 +12,6 @@ import {
 } from '@/lib/discord';
 import { DEFAULT_RANK_KEY, RANK_LADDER } from '@/lib/ranks';
 
-/** Onder deze lengte vergelijken we geen namen: te veel toevalstreffers. */
-const MIN_NAAMLENGTE = 3;
-
 /** Een rij op de ledenlijst, zoals we hem hier nodig hebben. */
 interface LidRij {
   id: string;
@@ -125,6 +122,7 @@ export async function POST() {
 
   const toegevoegd: string[] = [];
   const overgenomen: string[] = [];
+  const meerdereOpties: string[] = [];
   const rangAangepast: string[] = [];
   const zonderRangrol: string[] = [];
   const mislukt: string[] = [];
@@ -188,18 +186,19 @@ export async function POST() {
       continue;
     }
 
-    // 2. Staat hij al op de lijst onder een rij die niemand anders claimt?
-    //    Dan nemen we die rij over, inclusief telefoonnummer en notitie. Zo
-    //    herstelt een verkeerde koppeling zichzelf zodra de echte persoon
-    //    met de familierol langskomt.
+    /*
+     * 2. Staat hij al op de lijst onder een rij die niemand anders claimt?
+     *
+     * Overnemen gebeurt alleen bij een exact gelijke naam. Een rij overnemen
+     * betekent dat iemand het telefoonnummer en de interne notitie van die rij
+     * erft, en daarmee toegang tot de besloten lijst. Dat op een losse
+     * gelijkenis doen is te riskant: "Jayden" zit ook in "Jayden Loopie", en
+     * dan krijgt de verkeerde persoon andermans gegevens.
+     */
     const kaal = normalizeName(discordLid.displayName);
-    const kandidaten = vrijeRijen.filter((lid) => {
-      if (!nogVrij.has(lid.id)) return false;
-      const lidKaal = normalizeName(lid.name);
-      if (lidKaal === kaal) return true;
-      if (lidKaal.length < MIN_NAAMLENGTE || kaal.length < MIN_NAAMLENGTE) return false;
-      return lidKaal.includes(kaal) || kaal.includes(lidKaal);
-    });
+    const kandidaten = vrijeRijen.filter(
+      (lid) => nogVrij.has(lid.id) && normalizeName(lid.name) === kaal,
+    );
 
     if (kandidaten.length === 1) {
       const rij = kandidaten[0]!;
@@ -213,6 +212,18 @@ export async function POST() {
       } else {
         overgenomen.push(`${rij.name} -> @${discordLid.username}`);
       }
+      continue;
+    }
+
+    /*
+     * Meerdere rijen met dezelfde naam: handen eraf. Zouden we hier een nieuwe
+     * rij aanmaken, dan blijven die twee over als "niemand claimt ze" en
+     * worden ze verderop verwijderd — inclusief hun telefoonnummers en
+     * notities. Dus markeren we ze als bezet en melden we ze.
+     */
+    if (kandidaten.length > 1) {
+      for (const rij of kandidaten) nogVrij.delete(rij.id);
+      meerdereOpties.push(`${discordLid.displayName} (${kandidaten.length} rijen)`);
       continue;
     }
 
@@ -270,6 +281,7 @@ export async function POST() {
     metFamilierol: metFamilierol.length,
     toegevoegd,
     overgenomen,
+    meerdereOpties,
     rangAangepast,
     ongewijzigd,
     zonderRangrol,

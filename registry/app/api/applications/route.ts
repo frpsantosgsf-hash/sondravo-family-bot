@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
-import { syncDiscordBericht, verwijderDiscordBericht } from '@/lib/applications';
+import {
+  onthoudDiscordBericht,
+  syncDiscordBericht,
+  verwijderDiscordBericht,
+} from '@/lib/applications';
 import type { ApplicationRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -37,8 +41,21 @@ export async function GET(request: NextRequest) {
   const wilArchief =
     new URL(request.url).searchParams.get('archief') === '1' && access.isAdmin;
 
+  /*
+   * Row Level Security werkt per rij, niet per kolom. Zou hier select('*')
+   * staan, dan krijgt elk lid de interne notitie van de Lead en het
+   * Supabase-account-ID van de sollicitant mee in de JSON — onzichtbaar op het
+   * scherm, maar één tabblad in de ontwikkelaarstools verderop.
+   */
+  const KOLOMMEN_VOOR_LEDEN =
+    'id, created_at, name, age, phone, motivation, experience, availability, ' +
+    'discord_username, discord_user_id, avatar_url, status, voting_closed, ' +
+    'archived_at, archived_by, handled_by, handled_at';
+
   const supabase = await createClient();
-  const query = supabase.from('applications').select('*');
+  const query = supabase
+    .from('applications')
+    .select(access.isAdmin ? '*' : KOLOMMEN_VOOR_LEDEN);
 
   const { data, error } = await (wilArchief
     ? query.not('archived_at', 'is', null)
@@ -51,7 +68,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Kon de sollicitaties niet ophalen.' }, { status: 500 });
   }
 
-  const applications = (data ?? []) as ApplicationRow[];
+  const applications = (data ?? []) as unknown as ApplicationRow[];
   const votes = await tallyVotes(supabase, applications);
 
   return NextResponse.json({ applications, votes, isAdmin: access.isAdmin });
@@ -175,7 +192,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     await verwijderDiscordBericht(voor?.discord_message_id ?? null);
+    // Oude rijen kunnen nog een tweede bericht hebben uit de tijd dat elke
+    // statuswijziging een eigen melding plaatste.
     await verwijderDiscordBericht(voor?.discord_status_message_id ?? null);
+
+    // De ID's wissen: ze wijzen nu naar berichten die niet meer bestaan, en
+    // zonder dit zou een latere bewerking daar alsnog naartoe schrijven.
+    await onthoudDiscordBericht(input.id, null, null, true);
 
     revalidatePath('/sollicitaties');
     revalidatePath('/leden');

@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/Field';
@@ -23,6 +24,7 @@ interface ImportReport {
   metFamilierol?: number;
   toegevoegd?: string[];
   overgenomen?: string[];
+  meerdereOpties?: string[];
   rangAangepast?: string[];
   ongewijzigd?: number;
   zonderRangrol?: string[];
@@ -69,6 +71,8 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
   const [importing, setImporting] = useState(false);
   const [openVoorSollicitaties, setOpenVoorSollicitaties] = useState(settings.applicationsOpen);
   const [deurBezig, setDeurBezig] = useState(false);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
 
   useEffect(() => {
@@ -100,6 +104,10 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
       }
 
       setOpenVoorSollicitaties(open);
+      // Zonder deze verversing leest de dialoog bij de volgende opening weer
+      // de oude waarde uit de pagina, en denkt de Lead dat de deur nog
+      // openstaat terwijl hij hem net gesloten heeft.
+      startTransition(() => router.refresh());
       toast(open ? 'Sollicitaties staan open.' : 'Sollicitaties zijn gesloten.', 'success');
     } catch {
       toast('Bijwerken mislukt.', 'error');
@@ -331,6 +339,11 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
               label="Koppeling rechtgezet"
               hint="Deze stonden aan het verkeerde Discord-account. Hun telefoonnummer en notitie zijn bewaard gebleven."
               names={importReport.overgenomen ?? []}
+            />
+            <ReportList
+              label="Meerdere rijen met dezelfde naam"
+              hint="Er staan meerdere leden met deze naam op de lijst, dus is er niets aangeraakt. Geef ze verschillende namen of koppel ze met de hand."
+              names={importReport.meerdereOpties ?? []}
             />
             <ReportList
               label="Rang aangepast"

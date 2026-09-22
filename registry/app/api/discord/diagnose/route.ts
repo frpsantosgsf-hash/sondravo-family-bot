@@ -13,8 +13,13 @@ const DISCORD_API = 'https://discord.com/api/v10';
  * Zelftest voor de koppeling met Discord.
  *
  * Vertelt een ingelogde bezoeker waaróm hij wel of geen beheerrechten krijgt.
- * Toont nooit het bot-token of andere geheimen — alleen of ze gezet zijn, wat
- * Discord antwoordt, en welke rollen deze persoon zelf heeft.
+ * Bewust ook bruikbaar zónder beheerrechten: dat is nu juist het geval dat je
+ * wilt kunnen uitzoeken.
+ *
+ * Daarom worden de server- en rol-ID's alleen aan een bestaande admin getoond.
+ * Voor een gewone bezoeker zijn die nummers geen hulp maar een routebeschrijving
+ * naar de rol die hij moet zien te krijgen om hier binnen te komen. Hij krijgt
+ * te zien óf iets gezet is, en of zijn eigen rollen matchen — verder niets.
  */
 export async function GET() {
   if (!isSupabaseConfigured) {
@@ -38,14 +43,21 @@ export async function GET() {
   const discordUserId = discordIdFromMetadata(user.user_metadata as Record<string, unknown>);
   const { data: isAdmin } = await supabase.rpc('is_admin', {});
 
+  const magDetails = isAdmin === true;
+
   const rapport: Record<string, unknown> = {
     '1_ingelogd_als': user.email ?? user.id,
     '2_jouw_discord_id': discordUserId ?? 'NIET GEVONDEN',
     '3_beheerrechten_nu': isAdmin === true ? 'JA' : 'NEE',
     '4_instellingen': {
       DISCORD_BOT_TOKEN: config?.botToken ? 'gezet' : 'ONTBREEKT',
-      DISCORD_GUILD_ID: config?.guildId ?? 'ONTBREEKT',
-      DISCORD_ADMIN_ROLE_IDS: adminRoleIds.length > 0 ? adminRoleIds : 'ONTBREEKT of ongeldig',
+      DISCORD_GUILD_ID: config?.guildId ? (magDetails ? config.guildId : 'gezet') : 'ONTBREEKT',
+      DISCORD_ADMIN_ROLE_IDS:
+        adminRoleIds.length > 0
+          ? magDetails
+            ? adminRoleIds
+            : `${adminRoleIds.length} rol-ID('s) gezet`
+          : 'ONTBREEKT of ongeldig',
     },
   };
 
@@ -132,13 +144,20 @@ export async function GET() {
   const rollen = payload.roles ?? [];
   const treffer = rollen.filter((rol) => adminRoleIds.includes(rol));
 
-  rapport['6_jouw_rollen_in_de_server'] = rollen;
-  rapport['7_gezocht_rol_id'] = adminRoleIds;
+  if (magDetails) {
+    rapport['6_jouw_rollen_in_de_server'] = rollen;
+    rapport['7_gezocht_rol_id'] = adminRoleIds;
+  } else {
+    rapport['6_jouw_rollen_in_de_server'] = `${rollen.length} rol(len)`;
+    rapport['7_gezocht_rol_id'] = 'alleen zichtbaar voor een Lead';
+  }
 
   rapport['CONCLUSIE'] =
     treffer.length > 0
       ? 'ALLES GOED. Je hebt de juiste rol. Log uit en opnieuw in, dan krijg je beheerrechten.'
-      : 'Je hebt de gezochte rol NIET. Vergelijk hierboven lijst 6 met lijst 7: staat het nummer uit 7 niet in 6, dan is DISCORD_ADMIN_ROLE_IDS het verkeerde rol-ID. Haal het juiste op: Serverinstellingen, Rollen, rechtsklik op de rol, Rol-ID kopiëren.';
+      : magDetails
+        ? 'Je hebt de gezochte rol NIET. Vergelijk hierboven lijst 6 met lijst 7: staat het nummer uit 7 niet in 6, dan is DISCORD_ADMIN_ROLE_IDS het verkeerde rol-ID. Haal het juiste op: Serverinstellingen, Rollen, rechtsklik op de rol, Rol-ID kopiëren.'
+        : 'Je hebt de rol die beheerrechten geeft NIET. Vraag een Lead om die rol, of laat een Lead deze pagina openen — die ziet welke rol er precies gezocht wordt.';
 
   return NextResponse.json(rapport);
 }

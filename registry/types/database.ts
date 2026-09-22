@@ -261,7 +261,12 @@ export interface Database {
         Returns: Database['public']['Tables']['settings']['Row'];
       };
       set_application_discord_message: {
-        Args: { p_id: string; p_message_id?: string | null; p_status_message_id?: string | null };
+        Args: {
+          p_id: string;
+          p_message_id?: string | null;
+          p_status_message_id?: string | null;
+          p_clear?: boolean;
+        };
         Returns: void;
       };
     };

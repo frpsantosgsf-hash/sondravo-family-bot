@@ -97,14 +97,8 @@ export const getViewerAccess = cache(async (): Promise<ViewerAccess> => {
     return { ...basis, discordUnavailable: true };
   }
 
-  if (!profile) return basis;
-
-  if (!profile.inGuild) {
-    return {
-      ...basis,
-      discord: { ...basis.discord, userId: discordUserId },
-    };
-  }
+  // Niet in de server betekent geen rollen, en dus precies wat basis al zegt.
+  if (!profile || !profile.inGuild) return basis;
 
   return {
     ...basis,

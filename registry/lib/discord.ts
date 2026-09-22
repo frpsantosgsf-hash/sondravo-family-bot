@@ -204,11 +204,17 @@ export async function fetchGuildMembers(): Promise<GuildMember[] | null> {
     }
 
     const laatste = batch[batch.length - 1]?.user?.id;
-    if (!laatste || batch.length < 1000) break;
+    if (!laatste || batch.length < 1000) return leden;
     na = laatste;
   }
 
-  return leden;
+  /*
+   * De lus is op zijn rondelimiet gestopt, dus er zijn nog leden die we niet
+   * hebben gezien. Een halve lijst teruggeven is hier gevaarlijk: de rol-import
+   * verwijdert iedereen die er niet in staat, en zou dan mensen van de lijst
+   * halen omdat ze toevallig in het ongelezen staartje zaten.
+   */
+  return null;
 }
 
 /**

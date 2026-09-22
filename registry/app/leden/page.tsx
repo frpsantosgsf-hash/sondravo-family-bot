@@ -90,16 +90,6 @@ export default async function LedenPage() {
           </p>
         ) : null}
 
-        {viewer && !viewer.isAdmin ? (
-          <p
-            role="status"
-            className="mt-6 rounded-lg border border-line bg-panel-high px-4 py-3 text-sm leading-relaxed text-muted"
-          >
-            Je bent ingelogd, maar dit account heeft geen beheerrechten. Vraag een Lead om je toe
-            te voegen aan de admins.
-          </p>
-        ) : null}
-
         {/* Op een telefoon blijven de links in de balk bovenaan verborgen,
             dus hier staat de weg naar het stemmen nog een keer. */}
         <Link

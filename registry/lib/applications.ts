@@ -388,6 +388,7 @@ export async function onthoudDiscordBericht(
   applicationId: string,
   messageId: string | null,
   statusMessageId: string | null,
+  wis = false,
 ): Promise<void> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
 
@@ -396,6 +397,7 @@ export async function onthoudDiscordBericht(
       p_id: applicationId,
       p_message_id: messageId,
       p_status_message_id: statusMessageId,
+      p_clear: wis,
     });
   } catch {
     // Dan blijft het bericht straks in Discord staan. Vervelend, maar geen
