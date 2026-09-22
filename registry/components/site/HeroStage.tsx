@@ -139,28 +139,44 @@ export function HeroStage({ source, timing, poster }: HeroStageProps) {
       <div className="panel-sheen relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-line bg-void sm:aspect-video">
         {/* ---------- Laag 1: het fragment ---------- */}
         <div
-          className={`absolute inset-0 transition-all duration-[900ms] ease-out ${
-            showingClip ? 'scale-100 opacity-100' : 'pointer-events-none scale-[1.04] opacity-0'
+          className={`absolute inset-0 transition-opacity duration-[1400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
+            showingClip ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
           aria-hidden={!showingClip}
         >
-          {clipBroken ? null : source.kind === 'youtube' ? (
-            <YouTubeClipLayer
-              videoId={source.id}
-              startSeconds={timing.startSeconds}
-              ref={clipRef}
-              onReady={handleReady}
-              onUnavailable={handleUnavailable}
-            />
-          ) : (
-            <FileClipLayer
-              src={source.src}
-              poster={poster}
-              ref={clipRef}
-              onReady={handleReady}
-              onUnavailable={handleUnavailable}
-            />
-          )}
+          {/* Trage inzoom over de hele duur van het fragment. Aparte laag,
+              zodat de zoom losstaat van het in- en uitvloeien. */}
+          <div
+            className="absolute inset-0 will-change-transform"
+            style={{
+              transform: showingClip ? 'scale(1.09)' : 'scale(1)',
+              transitionProperty: 'transform',
+              transitionTimingFunction: 'linear',
+              transitionDuration: showingClip ? `${timing.clipMs + 1600}ms` : '0ms',
+              // Terugzetten pas nadat het beeld is weggevloeid, anders zie je springen.
+              transitionDelay: showingClip ? '0ms' : '1400ms',
+              // Lichte gradatie: iets meer diepte, iets minder videolook.
+              filter: 'contrast(1.07) saturate(1.06) brightness(0.97)',
+            }}
+          >
+            {clipBroken ? null : source.kind === 'youtube' ? (
+              <YouTubeClipLayer
+                videoId={source.id}
+                startSeconds={timing.startSeconds}
+                ref={clipRef}
+                onReady={handleReady}
+                onUnavailable={handleUnavailable}
+              />
+            ) : (
+              <FileClipLayer
+                src={source.src}
+                poster={poster}
+                ref={clipRef}
+                onReady={handleReady}
+                onUnavailable={handleUnavailable}
+              />
+            )}
+          </div>
 
           {/* Donkere rand rondom het beeld, zodat het fragment in de pagina
               zakt in plaats van er als een venster bovenop te liggen. */}
@@ -172,12 +188,29 @@ export function HeroStage({ source, timing, poster }: HeroStageProps) {
             aria-hidden
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_28%,rgba(6,7,6,0.55)_72%,rgba(6,7,6,0.92)_100%)]"
           />
+
+          {/* Filmkorrel over het beeld. */}
+          <div aria-hidden className="film-grain pointer-events-none absolute inset-0 overflow-hidden" />
         </div>
+
+        {/* ---------- Letterbox ----------
+            Twee zwarte balken die tijdens het fragment inschuiven. Dat geeft
+            het brede, filmische kader; bij het logo trekken ze weer weg. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-void transition-[height] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{ height: showingClip ? '8.5%' : '0%' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-void transition-[height] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{ height: showingClip ? '8.5%' : '0%' }}
+        />
 
         {/* ---------- Laag 2: het logo ---------- */}
         <div
-          className={`absolute inset-0 flex items-center justify-center px-8 transition-all duration-[900ms] ease-out ${
-            showingClip ? 'pointer-events-none scale-[0.97] opacity-0' : 'scale-100 opacity-100'
+          className={`absolute inset-0 flex items-center justify-center px-8 transition-all duration-[1400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
+            showingClip ? 'pointer-events-none scale-[0.96] opacity-0' : 'scale-100 opacity-100'
           }`}
         >
           <div
@@ -192,12 +225,13 @@ export function HeroStage({ source, timing, poster }: HeroStageProps) {
             priority
             sizes="(max-width: 640px) 78vw, 440px"
             className="animate-mark-in relative w-[78%] max-w-[440px] drop-shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
+            style={{ animation: 'mark-in 1.8s cubic-bezier(0.16,1,0.3,1) both, drift 14s ease-in-out 1.8s infinite alternate' }}
           />
         </div>
 
         {/* ---------- Bediening ---------- */}
         {clipAvailable ? (
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 p-3 sm:p-4">
+          <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-end gap-2 p-3 sm:p-4">
             {showingClip ? (
               <button
                 type="button"

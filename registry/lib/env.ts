@@ -32,6 +32,17 @@ export function getDiscordSyncConfig(): { botToken: string; guildId: string } | 
 }
 
 /**
+ * Discord-rollen die automatisch beheerrechten geven op de site.
+ * Meerdere rollen mogen, gescheiden door komma's. Leeg = uit.
+ */
+export function getAdminRoleIds(): string[] {
+  return String(process.env.DISCORD_ADMIN_ROLE_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => /^[0-9]{5,32}$/.test(id));
+}
+
+/**
  * Basis-URL van de site, gebruikt voor OAuth-redirects en metadata.
  * Vercel zet VERCEL_PROJECT_PRODUCTION_URL automatisch.
  */

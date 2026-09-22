@@ -389,9 +389,13 @@ De bot kan iemand rechtstreeks op de website zetten:
 /verwijder lid:@Xavier
 ```
 
-Alleen leiding kan deze commando's gebruiken. De wijziging verschijnt meteen op
-de site en komt in de History te staan, met de naam van degene die het commando
-gaf.
+Alleen leiding kan deze commando's gebruiken: de **Leader Sondravo Family**-rol
+(`FOUNDER_ROLE_ID`), de servereigenaar, en eventuele rollen in
+`MANAGEMENT_ROLE_IDS`. De wijziging verschijnt meteen op de site en komt in de
+History te staan, met de naam van degene die het commando gaf.
+
+Diezelfde Leader-rol kan ook op de website zelf de ledenlijst aanpassen; zie
+[Beheerrechten via de Leader-rol](registry/README.md#beheerrechten-via-de-leader-rol).
 
 **Instellen:**
 

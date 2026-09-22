@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getDiscordSyncConfig } from '@/lib/env';
+import { getAdminRoleIds, getDiscordSyncConfig } from '@/lib/env';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
@@ -25,6 +25,7 @@ interface DiscordUserPayload {
 interface DiscordMemberPayload {
   nick?: string | null;
   avatar?: string | null;
+  roles?: string[];
   user?: DiscordUserPayload;
 }
 
@@ -87,4 +88,56 @@ export async function fetchDiscordProfile(discordUserId: string): Promise<Discor
 
 export function isDiscordSyncEnabled(): boolean {
   return getDiscordSyncConfig() !== null;
+}
+
+/** Kan de site op basis van een Discord-rol beheerrechten uitdelen? */
+export function isRoleSyncEnabled(): boolean {
+  return getDiscordSyncConfig() !== null && getAdminRoleIds().length > 0;
+}
+
+export type RoleCheck =
+  | { status: 'admin' }
+  | { status: 'not-admin' }
+  | { status: 'unknown' };
+
+/**
+ * Heeft dit Discord-account een van de rollen die beheerrechten geven?
+ *
+ * Geeft bewust `unknown` terug wanneer we het niet zeker weten — sync uit,
+ * Discord onbereikbaar, rate limit. De aanroeper laat de rechten dan staan
+ * zoals ze zijn. Een storing bij Discord mag nooit iemand zijn rechten
+ * afnemen, en mag er ook nooit iemand rechten door krijgen.
+ */
+export async function checkAdminRole(discordUserId: string): Promise<RoleCheck> {
+  const config = getDiscordSyncConfig();
+  const adminRoleIds = getAdminRoleIds();
+
+  if (!config || adminRoleIds.length === 0) return { status: 'unknown' };
+  if (!/^[0-9]{5,32}$/.test(discordUserId)) return { status: 'unknown' };
+
+  let response: Response;
+  try {
+    response = await fetch(`${DISCORD_API}/guilds/${config.guildId}/members/${discordUserId}`, {
+      headers: { Authorization: `Bot ${config.botToken}` },
+      cache: 'no-store',
+    });
+  } catch {
+    return { status: 'unknown' };
+  }
+
+  // Niet (meer) in de server: dan ook geen beheerrechten.
+  if (response.status === 404) return { status: 'not-admin' };
+  if (!response.ok) return { status: 'unknown' };
+
+  let payload: DiscordMemberPayload;
+  try {
+    payload = (await response.json()) as DiscordMemberPayload;
+  } catch {
+    return { status: 'unknown' };
+  }
+
+  const roles = payload.roles ?? [];
+  return roles.some((role) => adminRoleIds.includes(role))
+    ? { status: 'admin' }
+    : { status: 'not-admin' };
 }

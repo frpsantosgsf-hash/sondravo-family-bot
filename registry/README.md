@@ -28,9 +28,10 @@ iets wijzigen.
 ## Wat de site doet
 
 ### Voorpagina (`/`)
-- Een intro-lus: het logo komt rustig in beeld en blijft ±3,5 seconde staan,
-  daarna vloeit er ±10 seconden uit onze clip in met een donkere rand eromheen,
-  en dan is het logo er weer — dat blijft zo doorgaan
+- Een cinematische intro-lus: het logo komt rustig in beeld en blijft ±3,5
+  seconde staan, daarna vloeit er ±10 seconden uit onze clip in — met
+  letterbox-balken, een trage inzoom, filmkorrel en een donkere rand eromheen —
+  en dan is het logo er weer. Dat blijft zo doorgaan
 - Te pauzeren met één knop (het logo blijft dan staan) en die keuze wordt
   onthouden; geluid staat standaard uit
 - Live ledenteller met capaciteitsbalk
@@ -82,7 +83,7 @@ registry/
 │   ├── discord.ts               Discord API (server-only)
 │   └── video.ts                 YouTube/bestand-herkenning voor de clip
 ├── supabase/
-│   ├── migrations/              5 SQL-bestanden, in volgorde uitvoeren
+│   ├── migrations/              6 SQL-bestanden, in volgorde uitvoeren
 │   ├── verify_rls.sql           Controlescript voor de beveiliging
 │   └── README.md
 ├── types/                       Database- en app-types
@@ -111,8 +112,9 @@ uit. Plak de inhoud, klik **Run**, en ga pas daarna naar het volgende bestand.
 | 3 | `supabase/migrations/0003_seed.sql` | De 9 rangen + onze 20 leden + capaciteit 20 |
 | 4 | `supabase/migrations/0004_bot_bridge.sql` | Koppeling voor `/new` in Discord |
 | 5 | `supabase/migrations/0005_rank_colors.sql` | De kleur van elke Discord-rol |
+| 6 | `supabase/migrations/0006_discord_admin_roles.sql` | Beheerrechten via de Leader-rol |
 
-Alle vijf zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
+Alle zes zijn **idempotent**: twee keer draaien levert geen dubbele leden op.
 
 ### 3. Discord Developer Application maken
 Ga naar [discord.com/developers/applications](https://discord.com/developers/applications)
@@ -239,6 +241,7 @@ Alles staat met uitleg in `.env.example`. Kort samengevat:
 | `SUPABASE_SERVICE_ROLE_KEY` | — | **nee** | Alleen voor `/new` vanuit Discord. Omzeilt RLS. |
 | `DISCORD_BOT_TOKEN` | — | **nee** | Discord-naam/avatar ophalen, aanwezigheid checken |
 | `DISCORD_GUILD_ID` | — | **nee** | Welke Discord-server gesynct wordt |
+| `DISCORD_ADMIN_ROLE_IDS` | — | **nee** | Rollen die automatisch beheerrechten geven |
 | `BOT_API_SECRET` | — | **nee** | Gedeeld geheim tussen bot en website |
 | `NEXT_PUBLIC_SITE_URL` | — | ja | Correcte OAuth-redirects en deelkaarten |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | — | ja | De intro-clip op de voorpagina |
@@ -269,6 +272,45 @@ values ('UUID-HIER');
 Er bestaat met opzet **geen** policy die inserts in `admins` via de API
 toestaat. Iemand admin maken kan alleen via de SQL Editor. Een gekaapte sessie
 kan dus nooit nieuwe admins aanmaken.
+
+### Beheerrechten via de Leader-rol
+
+Naast het handmatig toevoegen kun je beheerrechten aan een **Discord-rol**
+koppelen. Iedereen met die rol kan na het inloggen de ledenlijst aanpassen.
+
+Zet daarvoor in Vercel:
+
+```bash
+DISCORD_BOT_TOKEN=...                        # al nodig voor de Discord-sync
+DISCORD_GUILD_ID=...                         # idem
+DISCORD_ADMIN_ROLE_IDS=1488178372721901807   # Leader Sondravo Family
+```
+
+Dat rol-ID is dezelfde waarde als `FOUNDER_ROLE_ID` bij de bot. Meerdere rollen
+mogen, gescheiden door komma's.
+
+**Hoe het werkt:** bij elke login kijkt de server — met het bot-token, dus
+server-side — of dit Discord-account die rol heeft.
+
+| Situatie | Gevolg |
+|----------|--------|
+| Heeft de rol | Krijgt beheerrechten (`source = 'discord'`) |
+| Rol kwijtgeraakt | Rechten vervallen bij de volgende login |
+| Discord onbereikbaar | Er verandert **niets** — rechten blijven zoals ze waren |
+
+Twee dingen zijn met opzet zo gebouwd:
+
+1. **Handmatige admins worden nooit aangeraakt.** Rijen met `source = 'manual'`
+   blijven altijd staan. Ligt Discord plat of is het bot-token verlopen, dan kan
+   er nog steeds iemand bij. Zet jezelf dus altijd óók met de hand in `admins`.
+2. **Bij twijfel gebeurt er niets.** Kan de site de rol niet ophalen, dan worden
+   er geen rechten toegekend én geen rechten afgenomen.
+
+Wie welke route volgde, zie je zo:
+
+```sql
+select user_id, label, source, created_at from public.admins order by created_at;
+```
 
 ---
 
@@ -463,7 +505,7 @@ Alles wat code is, is klaar. Dit kan ik niet voor je doen omdat er accounts en
 geheimen bij komen kijken:
 
 - [ ] Supabase-project aanmaken (stap 1)
-- [ ] De vijf SQL-bestanden draaien (stap 2)
+- [ ] De zes SQL-bestanden draaien (stap 2)
 - [ ] Discord Developer Application aanmaken + redirect URL (stap 3 en 4)
 - [ ] Discord-provider in Supabase aanzetten (stap 5)
 - [ ] Eén keer inloggen en jezelf in `admins` zetten (stap 7 t/m 9)

@@ -81,8 +81,18 @@ export interface Database {
         Relationships: [];
       };
       admins: {
-        Row: { user_id: string; label: string | null; created_at: string };
-        Insert: { user_id: string; label?: string | null; created_at?: string };
+        Row: {
+          user_id: string;
+          label: string | null;
+          source: 'manual' | 'discord';
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          label?: string | null;
+          source?: 'manual' | 'discord';
+          created_at?: string;
+        };
         Update: Partial<Database['public']['Tables']['admins']['Insert']>;
         Relationships: [];
       };
