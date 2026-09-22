@@ -55,8 +55,10 @@ export default async function HomePage() {
               style={{ animationDelay: '0.8s' }}
             >
               {toonCijfers
-                ? 'Eén familie, één lijst. In de ledenlijst zie je iedereen netjes op rang.'
-                : 'Eén familie, één lijst. De ledenlijst is besloten — denk je dat je erbij hoort, solliciteer dan.'}
+                ? 'Eén familie, één lijst. Bekijk de ledenlijst of stem mee over wie erbij komt.'
+                : access.signedIn
+                  ? 'Eén familie, één lijst. De ledenlijst is besloten — denk je dat je erbij hoort, solliciteer dan.'
+                  : 'Eén familie, één lijst. Ben je al lid? Log in met Discord. Zo niet, dan kun je solliciteren.'}
             </p>
 
             <div
@@ -73,7 +75,32 @@ export default async function HomePage() {
                 </svg>
               </Link>
 
-              {source.kind === 'youtube' ? (
+              {/* Voor leden is stemmen de reden dat ze hier komen, dus die
+                  knop staat naast de ledenlijst. Op een telefoon is dit de
+                  enige route: de links in de balk bovenaan zijn daar te smal
+                  voor en blijven verborgen. */}
+              {toonCijfers ? (
+                <Link
+                  href="/sollicitaties"
+                  className="tap-target inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-panel-high px-6 text-sm uppercase tracking-[0.14em] text-ink transition-all duration-150 hover:border-creme/25 hover:bg-panel-hover sm:w-auto"
+                >
+                  Sollicitaties
+                  <svg
+                    viewBox="0 0 20 20"
+                    aria-hidden
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 6.5l2 2 3.5-3.5" />
+                    <path d="M12 6.5h4M12 13.5h4" />
+                    <path d="M4.5 12.5l3 3M7.5 12.5l-3 3" />
+                  </svg>
+                </Link>
+              ) : source.kind === 'youtube' ? (
                 <a
                   href={source.watchUrl}
                   target="_blank"

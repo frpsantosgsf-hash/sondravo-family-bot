@@ -73,6 +73,13 @@ export default async function SollicitatiesPage() {
           </p>
         </header>
 
+        <Link
+          href="/leden"
+          className="tap-target mt-5 inline-flex items-center gap-2 rounded-lg border border-line bg-panel-high px-4 text-[13px] uppercase tracking-[0.14em] text-ink transition-colors hover:border-creme/25 sm:hidden"
+        >
+          Naar de ledenlijst
+        </Link>
+
         <div className="mt-6 sm:mt-8">
           <ApplicationsBoard />
         </div>

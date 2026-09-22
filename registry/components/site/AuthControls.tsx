@@ -11,9 +11,9 @@ interface AuthControlsProps {
   next: string;
   disabled?: boolean;
   /**
-   * Tekst op de inlogknop. Standaard "Lead login", want in de balk bovenaan
-   * is dat de enige reden om in te loggen. Op het sollicitatieformulier klopt
-   * dat woord juist niet: daar logt een buitenstaander in, geen Lead.
+   * Tekst op de inlogknop. Standaard gewoon "Inloggen": leden loggen in om de
+   * ledenlijst te zien en te stemmen, sollicitanten om het formulier te
+   * openen. "Lead login" gaf de indruk dat het alleen voor de leiding was.
    */
   label?: string;
 }
@@ -26,7 +26,7 @@ export function AuthControls({
   viewer,
   next,
   disabled = false,
-  label = 'Lead login',
+  label = 'Inloggen',
 }: AuthControlsProps) {
   const [pending, setPending] = useState(false);
 

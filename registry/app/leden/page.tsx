@@ -98,6 +98,15 @@ export default async function LedenPage() {
           </p>
         ) : null}
 
+        {/* Op een telefoon blijven de links in de balk bovenaan verborgen,
+            dus hier staat de weg naar het stemmen nog een keer. */}
+        <Link
+          href="/sollicitaties"
+          className="tap-target mt-5 inline-flex items-center gap-2 rounded-lg border border-line bg-panel-high px-4 text-[13px] uppercase tracking-[0.14em] text-ink transition-colors hover:border-creme/25 sm:hidden"
+        >
+          Sollicitaties bekijken
+        </Link>
+
         <div className="mt-6 sm:mt-8">
           <RegistryView members={members} ranks={ranks} settings={settings} viewer={viewer} />
         </div>
