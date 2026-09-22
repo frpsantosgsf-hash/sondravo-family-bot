@@ -4,7 +4,39 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayApply } from '@/lib/access';
 import { applicationSchema, notifyDiscord, saveApplication } from '@/lib/applications';
-import type { ActionResult } from '@/types';
+
+/** De velden zoals ze zijn ingetypt, ruw. */
+export type ApplicationValues = Record<
+  'name' | 'age' | 'phone' | 'motivation' | 'experience' | 'availability',
+  string
+>;
+
+/**
+ * Bij een fout gaan de ingevulde waarden mee terug.
+ *
+ * Zonder dat staat iemand die één veld verkeerd invult opeens voor een leeg
+ * formulier, en is het verhaal dat hij net typte weg. Dat gebeurt precies bij
+ * degene die er moeite voor deed.
+ */
+export type ApplicationFormState =
+  | { ok: true; message: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string>; values: ApplicationValues };
+
+function readValues(formData: FormData): ApplicationValues {
+  const lees = (veld: string) => {
+    const waarde = formData.get(veld);
+    return typeof waarde === 'string' ? waarde : '';
+  };
+
+  return {
+    name: lees('name'),
+    age: lees('age'),
+    phone: lees('phone'),
+    motivation: lees('motivation'),
+    experience: lees('experience'),
+    availability: lees('availability'),
+  };
+}
 
 /**
  * Neemt een sollicitatie aan.
@@ -13,34 +45,33 @@ import type { ActionResult } from '@/types';
  * geen beveiliging: wie het adres kent kan het formulier gewoon posten.
  */
 export async function submitApplicationAction(
-  _state: ActionResult | null,
+  _state: ApplicationFormState | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ApplicationFormState> {
+  const values = readValues(formData);
   const access = await getViewerAccess();
 
   if (!access.signedIn) {
-    return { ok: false, error: 'Log eerst in met Discord.' };
+    return { ok: false, error: 'Log eerst in met Discord.', values };
   }
 
   if (access.discordUnavailable) {
     return {
       ok: false,
       error: 'Discord is even niet bereikbaar, dus je rol kan niet gecontroleerd worden.',
+      values,
     };
   }
 
   if (!mayApply(access)) {
-    return { ok: false, error: 'Je hebt de juiste Discord-rol niet om te kunnen solliciteren.' };
+    return {
+      ok: false,
+      error: 'Je hebt de juiste Discord-rol niet om te kunnen solliciteren.',
+      values,
+    };
   }
 
-  const parsed = applicationSchema.safeParse({
-    name: formData.get('name') ?? '',
-    age: formData.get('age') ?? '',
-    phone: formData.get('phone') ?? '',
-    motivation: formData.get('motivation') ?? '',
-    experience: formData.get('experience') ?? '',
-    availability: formData.get('availability') ?? '',
-  });
+  const parsed = applicationSchema.safeParse(values);
 
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -48,7 +79,7 @@ export async function submitApplicationAction(
       const veld = issue.path[0];
       if (typeof veld === 'string' && !fieldErrors[veld]) fieldErrors[veld] = issue.message;
     }
-    return { ok: false, error: 'Niet alles is goed ingevuld.', fieldErrors };
+    return { ok: false, error: 'Niet alles is goed ingevuld.', fieldErrors, values };
   }
 
   const supabase = await createClient();
@@ -57,12 +88,12 @@ export async function submitApplicationAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, error: 'Je sessie is verlopen. Log opnieuw in.' };
+    return { ok: false, error: 'Je sessie is verlopen. Log opnieuw in.', values };
   }
 
   const opgeslagen = await saveApplication(parsed.data, access, user.id);
   if (!opgeslagen.ok) {
-    return { ok: false, error: opgeslagen.error };
+    return { ok: false, error: opgeslagen.error, values };
   }
 
   // De melding in Discord mag de inzending nooit laten mislukken.

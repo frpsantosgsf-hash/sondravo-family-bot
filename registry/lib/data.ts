@@ -129,7 +129,16 @@ export const getRegistryData = cache(async (): Promise<RegistryData> => {
       }
     : FALLBACK_SETTINGS;
 
-  const failure = membersResult.error ?? ranksResult.error ?? settingsResult.error;
+  /*
+   * Sinds de ledenlijst besloten is, geeft de database aan een buitenstaander
+   * netjes "geen toegang" terug. Dat is geen storing maar precies de
+   * bedoeling, dus daar hoort geen rode foutbalk bij. Alleen een échte fout
+   * — een tabel die niet bestaat, een verbinding die wegvalt — verdient een
+   * melding.
+   */
+  const failure = [membersResult.error, ranksResult.error, settingsResult.error].find(
+    (error) => error && !isPermissionError(error),
+  );
 
   return {
     members,
@@ -141,6 +150,13 @@ export const getRegistryData = cache(async (): Promise<RegistryData> => {
       : null,
   };
 });
+
+/** Weigert de database dit alleen omdat de bezoeker er niet bij mag? */
+function isPermissionError(error: { code?: string | null; message?: string | null }): boolean {
+  // 42501 = insufficient_privilege, PGRST301 = geen (geldige) sessie.
+  if (error.code === '42501' || error.code === 'PGRST301') return true;
+  return /permission denied|row-level security/i.test(error.message ?? '');
+}
 
 /** History. Geeft een lege lijst terug voor iedereen die geen admin is (RLS). */
 export async function getAuditLog(limit = 100): Promise<AuditEntry[]> {
