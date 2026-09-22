@@ -18,8 +18,17 @@ export interface ViewerAccess {
   signedIn: boolean;
   /** Lead/Admin: beheert de lijst en de sollicitaties. */
   isAdmin: boolean;
-  /** Draagt de familierol: mag de ledenlijst inzien. */
+  /** Draagt de familierol in Discord. */
   isFamily: boolean;
+  /**
+   * Staat als lid in het register, met dit Discord-account eraan gekoppeld.
+   *
+   * Dit is wat de database gebruikt om rijen door te laten, en dus wat
+   * werkelijk toegang geeft. De rol in Discord zegt daar niets over: een lid
+   * dat met de hand is toegevoegd zonder Discord-ID draagt de rol wél, maar
+   * krijgt van de database niets te zien.
+   */
+  inRegister: boolean;
   /** Draagt de sollicitatierol: mag het formulier openen. */
   canApply: boolean;
   /** Het Discord-account van de bezoeker, voor zover bekend. */
@@ -41,6 +50,7 @@ const GEEN_TOEGANG: ViewerAccess = {
   signedIn: false,
   isAdmin: false,
   isFamily: false,
+  inRegister: false,
   canApply: false,
   discord: { userId: null, username: null, displayName: null, avatarUrl: null },
   discordUnavailable: false,
@@ -56,13 +66,20 @@ export const getViewerAccess = cache(async (): Promise<ViewerAccess> => {
 
   if (!user) return GEEN_TOEGANG;
 
-  const { data: isAdmin } = await supabase.rpc('is_admin', {});
+  // Dezelfde vraag als de database stelt, zodat de knoppen niet iets beloven
+  // wat Row Level Security daarna weigert.
+  const [{ data: isAdmin }, { data: inRegister }] = await Promise.all([
+    supabase.rpc('is_admin', {}),
+    supabase.rpc('is_family_member', {}),
+  ]);
+
   const discordUserId = discordIdFromMetadata(user.user_metadata as Record<string, unknown>);
 
   const basis: ViewerAccess = {
     ...GEEN_TOEGANG,
     signedIn: true,
     isAdmin: isAdmin === true,
+    inRegister: inRegister === true,
     discord: { ...GEEN_TOEGANG.discord, userId: discordUserId },
   };
 
@@ -102,9 +119,25 @@ export const getViewerAccess = cache(async (): Promise<ViewerAccess> => {
   };
 });
 
-/** Mag deze bezoeker de ledenlijst zien? */
+/**
+ * Mag deze bezoeker de ledenlijst zien?
+ *
+ * Bewust op inRegister en niet op de Discord-rol: de database laat alleen
+ * rijen door aan wie zelf op de lijst staat. Zou dit op de rol gaan, dan
+ * kreeg iemand een lege pagina zonder uitleg in plaats van een nette melding.
+ */
 export function mayViewRegistry(access: ViewerAccess): boolean {
-  return access.isAdmin || access.isFamily;
+  return access.isAdmin || access.inRegister;
+}
+
+/**
+ * Draagt de familierol, maar hangt nog aan geen enkel lid op de lijst.
+ *
+ * Dat is een koppeling die een Lead moet leggen — niet iets wat de bezoeker
+ * zelf kan oplossen, dus dat hoort hij ook te horen.
+ */
+export function isUnlinkedFamily(access: ViewerAccess): boolean {
+  return access.isFamily && !access.inRegister && !access.isAdmin;
 }
 
 /** Mag deze bezoeker het sollicitatieformulier openen? */

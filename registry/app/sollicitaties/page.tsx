@@ -4,7 +4,7 @@ import { SiteNav } from '@/components/site/SiteNav';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { AuthControls } from '@/components/site/AuthControls';
 import { ApplicationsPanel } from '@/components/applications/ApplicationsPanel';
-import { getViewerAccess, mayViewRegistry } from '@/lib/access';
+import { getViewerAccess, isUnlinkedFamily, mayViewRegistry } from '@/lib/access';
 import { getRegistryData } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,9 @@ export default async function SollicitatiesPage() {
               Alleen voor de familie
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-ink/80">
-              Alleen leden van Sondravo kunnen de sollicitaties bekijken en erover stemmen.
+              {isUnlinkedFamily(access)
+                ? 'Je draagt de familierol wel, maar je Discord-account hangt nog niet aan een lid op de lijst. Vraag een Lead om "Uit rollen halen" te draaien, dan kun je meteen meestemmen.'
+                : 'Alleen leden van Sondravo kunnen de sollicitaties bekijken en erover stemmen.'}
             </p>
 
             {!access.signedIn ? (

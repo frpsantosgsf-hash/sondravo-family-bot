@@ -6,7 +6,7 @@ import { RegistryView } from '@/components/registry/RegistryView';
 import Link from 'next/link';
 import { AuthControls } from '@/components/site/AuthControls';
 import { getRegistryData } from '@/lib/data';
-import { getViewerAccess, mayApply, mayViewRegistry } from '@/lib/access';
+import { getViewerAccess, isUnlinkedFamily, mayApply, mayViewRegistry } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +45,9 @@ export default async function LedenPage() {
                 ? 'De ledenlijst is niet openbaar. Log in met Discord; hoor je bij de familie, dan opent de lijst vanzelf.'
                 : access.discordUnavailable
                   ? 'Discord is even niet bereikbaar, dus we kunnen je rol niet controleren. Probeer het zo nog eens.'
-                  : 'Je bent ingelogd, maar je draagt de familierol niet in onze Discord-server. Daarom blijft de ledenlijst dicht.'}
+                  : isUnlinkedFamily(access)
+                    ? 'Je draagt de familierol wel, maar je Discord-account hangt nog niet aan een lid op de lijst. Vraag een Lead om "Uit rollen halen" te draaien, dan ben je er meteen bij.'
+                    : 'Je bent ingelogd, maar je draagt de familierol niet in onze Discord-server. Daarom blijft de ledenlijst dicht.'}
             </p>
 
             {!access.signedIn ? (

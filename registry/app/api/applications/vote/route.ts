@@ -53,6 +53,25 @@ export async function POST(request: NextRequest) {
 
   const { applicationId, vote } = parsed.data;
 
+  /*
+   * Eerst vragen of er nog gestemd mag worden.
+   *
+   * Bij een insert weigert de database hoorbaar, maar een delete die door de
+   * policy wordt tegengehouden raakt gewoon nul rijen en geeft geen fout. Een
+   * lid met een oude pagina open kreeg daardoor "gelukt" te zien terwijl zijn
+   * stem gewoon bleef staan.
+   */
+  const { data: magStemmen } = await supabase.rpc('application_accepts_votes', {
+    p_id: applicationId,
+  });
+
+  if (magStemmen !== true) {
+    return NextResponse.json(
+      { error: 'Er kan niet meer gestemd worden op deze sollicitatie.' },
+      { status: 409 },
+    );
+  }
+
   if (vote === null) {
     const { error } = await supabase
       .from('application_votes')

@@ -308,6 +308,28 @@ export async function syncDiscordBericht(applicationId: string): Promise<void> {
 }
 
 /**
+ * Staat de deur open voor nieuwe sollicitaties?
+ *
+ * Bewust een eigen leesactie en niet die uit getRegistryData: die valt bij een
+ * fout terug op "open", wat voor het tonen van een pagina prima is maar hier
+ * betekent dat een hapering de gesloten deur negeert. Lukt het lezen niet, dan
+ * gaat deze functie uit van dicht. Liever een sollicitant die even moet wachten
+ * dan een dichte deur die toch openstaat.
+ */
+export async function applicationsAreOpen(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('settings')
+    .select('applications_open')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (error) return false;
+  // Geen rij betekent een verse installatie: dan staat de deur gewoon open.
+  return data ? data.applications_open !== false : true;
+}
+
+/**
  * De eigen sollicitatie van de ingelogde bezoeker, als die er is.
  *
  * Zo weet de pagina zélf dat er al iets is ingestuurd, ook als je hem morgen
@@ -325,10 +347,13 @@ export async function getMyApplication(): Promise<ApplicationRow | null> {
 
   if (!user) return null;
 
+  // Gearchiveerd telt niet mee: die sollicitatie is uit beeld gehaald en mag
+  // de inzender niet blijven achtervolgen met "je aanmelding staat open".
   const { data } = await supabase
     .from('applications')
     .select('*')
     .eq('auth_user_id', user.id)
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

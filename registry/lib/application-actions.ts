@@ -4,11 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayApply } from '@/lib/access';
 import {
   applicationSchema,
+  applicationsAreOpen,
   notifyDiscord,
   onthoudDiscordBericht,
   saveApplication,
 } from '@/lib/applications';
-import { getRegistryData } from '@/lib/data';
 
 /** De velden zoals ze zijn ingetypt, ruw. */
 export type ApplicationValues = Record<
@@ -63,8 +63,7 @@ export async function submitApplicationAction(
   // De deur kan dicht staan omdat de familie vol zit. Ook dat wordt hier
   // gecontroleerd en niet alleen in de pagina: het formulier posten kan
   // iedereen die het adres kent.
-  const { settings } = await getRegistryData();
-  if (!settings.applicationsOpen) {
+  if (!(await applicationsAreOpen())) {
     return {
       ok: false,
       error: 'De sollicitaties zijn op dit moment gesloten.',

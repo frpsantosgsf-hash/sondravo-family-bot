@@ -224,6 +224,10 @@ export interface Database {
         Args: Record<never, never>;
         Returns: boolean;
       };
+      application_accepts_votes: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
       submit_application: {
         Args: {
           p_auth_user_id: string;
