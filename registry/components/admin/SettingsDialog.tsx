@@ -22,9 +22,11 @@ interface MatchReport {
 interface ImportReport {
   metFamilierol?: number;
   toegevoegd?: string[];
+  overgenomen?: string[];
   rangAangepast?: string[];
   ongewijzigd?: number;
   zonderRangrol?: string[];
+  verwijderd?: string[];
   zonderFamilierol?: string[];
   mislukt?: string[];
 }
@@ -205,9 +207,9 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
             Discord
           </h3>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
-            <strong className="text-ink/80">Uit rollen halen</strong> bouwt de lijst op uit je
-            Discord-server: iedereen met de familierol komt erop, en zijn rangrol bepaalt zijn
-            plek. Dit is de betrouwbaarste manier — er wordt niet op namen gegokt.
+            <strong className="text-ink/80">Uit rollen halen</strong> maakt de lijst gelijk aan je
+            Discord-server: iedereen met de familierol komt erop met zijn rangrol als rang, en wie
+            de familierol niet draagt gaat eraf. Foto, @naam en rang worden meteen goed gezet.
           </p>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
             <strong className="text-ink/80">Koppelen</strong> zoekt voor elk lid het Discord-account
@@ -263,6 +265,11 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
               names={importReport.toegevoegd ?? []}
             />
             <ReportList
+              label="Koppeling rechtgezet"
+              hint="Deze stonden aan het verkeerde Discord-account. Hun telefoonnummer en notitie zijn bewaard gebleven."
+              names={importReport.overgenomen ?? []}
+            />
+            <ReportList
               label="Rang aangepast"
               hint="De rangrol in Discord week af van de lijst. De Discord-rol wint."
               names={importReport.rangAangepast ?? []}
@@ -273,8 +280,13 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
               names={importReport.zonderRangrol ?? []}
             />
             <ReportList
-              label="Familierol kwijt"
-              hint="Staan wel op de lijst, maar dragen de familierol niet meer. Er is niemand verwijderd — dat beslis jij."
+              label="Van de lijst gehaald"
+              hint="Deze dragen de familierol niet, dus horen ze er niet op. Terug te zien in History."
+              names={importReport.verwijderd ?? []}
+            />
+            <ReportList
+              label="Niet verwijderd"
+              hint="Discord gaf geen enkel lid met de familierol terug. Dat is verdacht, dus is er voor de zekerheid niemand weggehaald."
               names={importReport.zonderFamilierol ?? []}
             />
             <ReportList

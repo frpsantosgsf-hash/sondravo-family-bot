@@ -8,8 +8,19 @@ import {
   fetchGuildRoles,
   isDiscordSyncEnabled,
   normalizeName,
+  type GuildMember,
 } from '@/lib/discord';
 import { DEFAULT_RANK_KEY, RANK_LADDER } from '@/lib/ranks';
+
+/** Onder deze lengte vergelijken we geen namen: te veel toevalstreffers. */
+const MIN_NAAMLENGTE = 3;
+
+/** Een rij op de ledenlijst, zoals we hem hier nodig hebben. */
+interface LidRij {
+  id: string;
+  name: string;
+  rank: string;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,8 +33,9 @@ export const dynamic = 'force-dynamic';
  * is het raden op namen van de baan — die gok koppelde twee mensen met een
  * gelijkende naam aan elkaar.
  *
- * Er wordt nooit iemand verwijderd. Raakt iemand zijn rol kwijt, dan komt hij
- * in het rapport te staan en beslis jij wat ermee gebeurt.
+ * De rol is de lijst, dus wie hem niet draagt gaat er ook af. Dat staat in het
+ * rapport en in de geschiedenis, zodat altijd terug te zien is wat er weg is
+ * gegaan en waarom.
  */
 export async function POST() {
   const gate = await requireAdmin();
@@ -83,21 +95,77 @@ export async function POST() {
     return NextResponse.json({ error: 'Kon de ledenlijst niet ophalen.' }, { status: 500 });
   }
 
-  // Wie staat er al op de lijst, en onder welk Discord-account?
-  const ledenOpDiscordId = new Map<string, (typeof leden)[number]>();
+  const metFamilierol = guildLeden.filter((lid) => lid.roleIds.includes(memberRoleId));
+  const familieIds = new Set(metFamilierol.map((lid) => lid.discordUserId));
+
+  // Welke rij op de lijst hoort bij welk Discord-account?
+  const discordIdPerLid = new Map<string, string>();
   for (const koppeling of koppelingen ?? []) {
-    if (!koppeling.discord_user_id) continue;
-    const lid = leden.find((l) => l.id === koppeling.member_id);
-    if (lid) ledenOpDiscordId.set(koppeling.discord_user_id, lid);
+    if (koppeling.discord_user_id) discordIdPerLid.set(koppeling.member_id, koppeling.discord_user_id);
   }
 
+  const rijen: LidRij[] = leden;
+  const lidOpDiscordId = new Map<string, LidRij>();
+  for (const lid of rijen) {
+    const discordId = discordIdPerLid.get(lid.id);
+    if (discordId) lidOpDiscordId.set(discordId, lid);
+  }
+
+  /**
+   * Rijen die door niemand met de familierol worden geclaimd. Dat zijn leden
+   * zonder koppeling, maar ook leden die aan het verkeerde account hangen —
+   * precies die laatste groep moet weer los kunnen, anders blijft een foute
+   * koppeling voor altijd staan.
+   */
+  const vrijeRijen = rijen.filter((lid) => {
+    const discordId = discordIdPerLid.get(lid.id);
+    return !discordId || !familieIds.has(discordId);
+  });
+  const nogVrij = new Set(vrijeRijen.map((lid) => lid.id));
+
   const toegevoegd: string[] = [];
+  const overgenomen: string[] = [];
   const rangAangepast: string[] = [];
   const zonderRangrol: string[] = [];
   const mislukt: string[] = [];
   let ongewijzigd = 0;
 
-  const metFamilierol = guildLeden.filter((lid) => lid.roleIds.includes(memberRoleId));
+  /** Zet de rang, foto en @naam van een bestaande rij gelijk aan Discord. */
+  async function werkRijBij(
+    lid: LidRij,
+    rang: string,
+    discordLid: GuildMember,
+  ): Promise<'fout' | 'rang' | 'gelijk'> {
+    const patch: { rank?: string; avatar_url?: string; discord_username?: string } = {
+      discord_username: discordLid.username,
+    };
+    if (lid.rank !== rang) patch.rank = rang;
+    if (discordLid.avatarUrl) patch.avatar_url = discordLid.avatarUrl;
+
+    const { error } = await supabase.from('members').update(patch).eq('id', lid.id);
+    if (error) return 'fout';
+    return patch.rank ? 'rang' : 'gelijk';
+  }
+
+  /** Hangt een rij aan een Discord-account, ook als er al een fout ID stond. */
+  async function koppelRij(memberId: string, discordUserId: string): Promise<boolean> {
+    const { data: bestaandeRij } = await supabase
+      .from('private_member_data')
+      .select('member_id')
+      .eq('member_id', memberId)
+      .maybeSingle();
+
+    const { error } = bestaandeRij
+      ? await supabase
+          .from('private_member_data')
+          .update({ discord_user_id: discordUserId, updated_at: new Date().toISOString() })
+          .eq('member_id', memberId)
+      : await supabase
+          .from('private_member_data')
+          .insert({ member_id: memberId, discord_user_id: discordUserId });
+
+    return !error;
+  }
 
   for (const discordLid of metFamilierol) {
     // De hoogste rang wint, zodat iemand met twee rangrollen niet op de
@@ -110,29 +178,45 @@ export async function POST() {
     const rang = rangen[0]?.key ?? DEFAULT_RANK_KEY;
     if (rangen.length === 0) zonderRangrol.push(discordLid.displayName);
 
-    const bestaand = ledenOpDiscordId.get(discordLid.discordUserId);
-
+    // 1. Al aan dit account gekoppeld: gewoon bijwerken.
+    const bestaand = lidOpDiscordId.get(discordLid.discordUserId);
     if (bestaand) {
-      const patch: { rank?: string; avatar_url?: string; discord_username?: string } = {
-        discord_username: discordLid.username,
-      };
-      if (bestaand.rank !== rang) patch.rank = rang;
-      if (discordLid.avatarUrl) patch.avatar_url = discordLid.avatarUrl;
+      const uitkomst = await werkRijBij(bestaand, rang, discordLid);
+      if (uitkomst === 'fout') mislukt.push(bestaand.name);
+      else if (uitkomst === 'rang') rangAangepast.push(`${bestaand.name}: ${bestaand.rank} -> ${rang}`);
+      else ongewijzigd += 1;
+      continue;
+    }
 
-      const { error } = await supabase.from('members').update(patch).eq('id', bestaand.id);
+    // 2. Staat hij al op de lijst onder een rij die niemand anders claimt?
+    //    Dan nemen we die rij over, inclusief telefoonnummer en notitie. Zo
+    //    herstelt een verkeerde koppeling zichzelf zodra de echte persoon
+    //    met de familierol langskomt.
+    const kaal = normalizeName(discordLid.displayName);
+    const kandidaten = vrijeRijen.filter((lid) => {
+      if (!nogVrij.has(lid.id)) return false;
+      const lidKaal = normalizeName(lid.name);
+      if (lidKaal === kaal) return true;
+      if (lidKaal.length < MIN_NAAMLENGTE || kaal.length < MIN_NAAMLENGTE) return false;
+      return lidKaal.includes(kaal) || kaal.includes(lidKaal);
+    });
 
-      if (error) {
-        mislukt.push(bestaand.name);
-      } else if (patch.rank) {
-        rangAangepast.push(`${bestaand.name}: ${bestaand.rank} -> ${rang}`);
+    if (kandidaten.length === 1) {
+      const rij = kandidaten[0]!;
+      nogVrij.delete(rij.id);
+
+      const gekoppeld = await koppelRij(rij.id, discordLid.discordUserId);
+      const uitkomst = await werkRijBij(rij, rang, discordLid);
+
+      if (!gekoppeld || uitkomst === 'fout') {
+        mislukt.push(rij.name);
       } else {
-        ongewijzigd += 1;
+        overgenomen.push(`${rij.name} -> @${discordLid.username}`);
       }
       continue;
     }
 
-    // Nieuw lid. De servernaam wordt de naam op de lijst, zodat de site
-    // dezelfde namen toont als Discord.
+    // 3. Nog niet op de lijst: erbij zetten, met de servernaam als naam.
     const { data: nieuwId, error } = await supabase.rpc('admin_save_member', {
       p_id: null,
       p_name: discordLid.displayName.slice(0, 64),
@@ -153,12 +237,31 @@ export async function POST() {
     toegevoegd.push(discordLid.displayName);
   }
 
-  // Leden op de lijst die de familierol niet (meer) dragen. Alleen melden:
-  // iemand van de lijst halen is een beslissing van een mens.
-  const idsMetRol = new Set(metFamilierol.map((lid) => lid.discordUserId));
-  const zonderFamilierol = [...ledenOpDiscordId.entries()]
-    .filter(([discordId]) => !idsMetRol.has(discordId))
-    .map(([, lid]) => lid.name);
+  /*
+   * Rijen die na afloop nog vrij zijn, horen bij niemand met de familierol en
+   * gaan van de lijst af. De rol ís de ledenlijst: draagt iemand hem niet, dan
+   * hoort hij er ook niet op en telt hij niet mee in de teller.
+   *
+   * Eén rem daarop: levert Discord geen enkel lid met de familierol op, dan
+   * klopt er iets niet aan de kant van Discord en zou dit de hele lijst
+   * leegvegen. In dat geval blijft alles staan en meldt hij het alleen.
+   */
+  const overgebleven = vrijeRijen.filter((lid) => nogVrij.has(lid.id));
+  const verwijderd: string[] = [];
+  const zonderFamilierol: string[] = [];
+
+  if (metFamilierol.length === 0) {
+    zonderFamilierol.push(...overgebleven.map((lid) => lid.name));
+  } else {
+    for (const lid of overgebleven) {
+      const { error } = await supabase.from('members').delete().eq('id', lid.id);
+      if (error) {
+        mislukt.push(lid.name);
+      } else {
+        verwijderd.push(lid.name);
+      }
+    }
+  }
 
   revalidatePath('/');
   revalidatePath('/leden');
@@ -166,9 +269,11 @@ export async function POST() {
   return NextResponse.json({
     metFamilierol: metFamilierol.length,
     toegevoegd,
+    overgenomen,
     rangAangepast,
     ongewijzigd,
     zonderRangrol,
+    verwijderd,
     zonderFamilierol,
     mislukt,
   });
