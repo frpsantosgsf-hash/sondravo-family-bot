@@ -92,29 +92,21 @@ export async function saveApplication(
 }
 
 /**
- * Meldt een nieuwe sollicitatie in Discord.
- *
- * Mag nooit de inzending laten mislukken: als de webhook eruit ligt, staat de
- * sollicitatie nog steeds netjes op de site.
+ * Kleur en kop per status. Dezelfde kleuren als op de site, zodat een
+ * sollicitatie er in Discord net zo uitziet als in het overzicht: oranje
+ * vraagt om aandacht, groen en rood zijn afgehandeld.
  */
-export async function notifyDiscord(input: ApplicationInput, access: ViewerAccess): Promise<void> {
+const STATUS_STIJL: Record<string, { kleur: number; kop: string }> = {
+  nieuw: { kleur: 0xe0871f, kop: '📨  Nieuwe sollicitatie' },
+  in_behandeling: { kleur: 0xc9b98a, kop: '👀  Sollicitatie in behandeling' },
+  aangenomen: { kleur: 0x2fa36b, kop: '✅  Sollicitatie aangenomen' },
+  afgewezen: { kleur: 0xd71920, kop: '❌  Sollicitatie afgewezen' },
+};
+
+/** Stuurt één bericht naar de webhook. Faalt nooit hardop. */
+async function stuurNaarDiscord(embed: Record<string, unknown>): Promise<void> {
   const webhookUrl = getApplicationWebhookUrl();
   if (!webhookUrl) return;
-
-  const velden: { name: string; value: string; inline?: boolean }[] = [
-    { name: 'Naam', value: input.name, inline: true },
-  ];
-
-  if (input.age) velden.push({ name: 'Leeftijd', value: String(input.age), inline: true });
-  if (input.phone) velden.push({ name: 'Ingame telefoon', value: input.phone, inline: true });
-  if (access.discord.username) {
-    velden.push({ name: 'Discord', value: `<@${access.discord.userId}>`, inline: true });
-  }
-  velden.push({ name: 'Waarom Sondravo', value: knip(input.motivation, 1024) });
-  if (input.experience) velden.push({ name: 'Ervaring', value: knip(input.experience, 1024) });
-  if (input.availability) {
-    velden.push({ name: 'Beschikbaarheid', value: knip(input.availability, 1024) });
-  }
 
   try {
     await fetch(webhookUrl, {
@@ -122,25 +114,99 @@ export async function notifyDiscord(input: ApplicationInput, access: ViewerAcces
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         username: 'Sondravo Registry',
-        embeds: [
-          {
-            title: 'Nieuwe sollicitatie',
-            url: `${getSiteUrl()}/leden`,
-            color: 0xd71920,
-            timestamp: new Date().toISOString(),
-            thumbnail: access.discord.avatarUrl ? { url: access.discord.avatarUrl } : undefined,
-            fields: velden,
-            footer: { text: 'Afhandelen kan bij Instellingen > Sollicitaties' },
-          },
-        ],
-        // Geen enkele ping vanuit een webhook: de <@id> hierboven blijft een
-        // nette naam, maar haalt niemand uit zijn slaap.
+        embeds: [embed],
+        // Geen enkele ping vanuit een webhook: een <@id> blijft een nette
+        // naam, maar haalt niemand uit zijn slaap.
         allowed_mentions: { parse: [] },
       }),
     });
   } catch {
-    // Stilte is hier het juiste gedrag: de sollicitatie is al opgeslagen.
+    // Stilte is hier het juiste gedrag: de sollicitatie staat al opgeslagen.
   }
+}
+
+/**
+ * Meldt een nieuwe sollicitatie in Discord.
+ *
+ * Mag nooit de inzending laten mislukken: als de webhook eruit ligt, staat de
+ * sollicitatie nog steeds netjes op de site.
+ */
+export async function notifyDiscord(input: ApplicationInput, access: ViewerAccess): Promise<void> {
+  const stijl = STATUS_STIJL['nieuw']!;
+
+  // De korte gegevens naast elkaar, de verhalen eronder. Discord zet drie
+  // inline-velden op één regel, dus dit blijft ook op een telefoon leesbaar.
+  const velden: { name: string; value: string; inline?: boolean }[] = [
+    { name: 'Leeftijd', value: input.age ? String(input.age) : '—', inline: true },
+    { name: 'Ingame telefoon', value: input.phone || '—', inline: true },
+    {
+      name: 'Discord',
+      value: access.discord.userId ? `<@${access.discord.userId}>` : '—',
+      inline: true,
+    },
+    { name: '\u200b', value: `**Waarom Sondravo**\n${knip(input.motivation, 900)}` },
+  ];
+
+  if (input.experience) {
+    velden.push({ name: '\u200b', value: `**Ervaring in FiveM**\n${knip(input.experience, 900)}` });
+  }
+  if (input.availability) {
+    velden.push({
+      name: '\u200b',
+      value: `**Wanneer online**\n${knip(input.availability, 900)}`,
+    });
+  }
+
+  await stuurNaarDiscord({
+    author: {
+      name: input.name,
+      icon_url: access.discord.avatarUrl ?? undefined,
+    },
+    title: stijl.kop,
+    url: `${getSiteUrl()}/sollicitaties`,
+    description: 'Leden kunnen stemmen op de site. De Lead beslist.',
+    color: stijl.kleur,
+    timestamp: new Date().toISOString(),
+    thumbnail: access.discord.avatarUrl ? { url: access.discord.avatarUrl } : undefined,
+    fields: velden,
+    footer: { text: 'sondravo-family.nl  ·  Stemmen kan bij Sollicitaties' },
+  });
+}
+
+/**
+ * Meldt in Discord dat een sollicitatie is afgehandeld.
+ *
+ * Kort en met de kleur van de uitkomst, zodat het kanaal in één blik laat
+ * zien wat er met iemand gebeurd is zonder dat je de site hoeft te openen.
+ */
+export async function notifyDiscordStatus(
+  row: Pick<ApplicationRow, 'name' | 'status' | 'discord_user_id' | 'avatar_url' | 'handled_by'>,
+  stemmen?: { ja: number; nee: number },
+): Promise<void> {
+  const stijl = STATUS_STIJL[row.status];
+  if (!stijl) return;
+
+  const velden: { name: string; value: string; inline?: boolean }[] = [
+    {
+      name: 'Discord',
+      value: row.discord_user_id ? `<@${row.discord_user_id}>` : '—',
+      inline: true,
+    },
+    { name: 'Besloten door', value: row.handled_by || '—', inline: true },
+  ];
+
+  if (stemmen) {
+    velden.push({ name: 'Stemmen', value: `✅ ${stemmen.ja}   ❌ ${stemmen.nee}`, inline: true });
+  }
+
+  await stuurNaarDiscord({
+    author: { name: row.name, icon_url: row.avatar_url ?? undefined },
+    title: stijl.kop,
+    color: stijl.kleur,
+    timestamp: new Date().toISOString(),
+    fields: velden,
+    footer: { text: 'sondravo-family.nl' },
+  });
 }
 
 /**

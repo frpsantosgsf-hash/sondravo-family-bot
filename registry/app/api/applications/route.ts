@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
+import { notifyDiscordStatus } from '@/lib/applications';
 import type { ApplicationRow } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -115,7 +116,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc('admin_set_application_status', {
+  const { data: row, error } = await supabase.rpc('admin_set_application_status', {
     p_id: parsed.data.id,
     p_status: parsed.data.status,
     p_note: parsed.data.note ?? null,
@@ -123,6 +124,20 @@ export async function PATCH(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: 'Bijwerken is niet gelukt.' }, { status: 500 });
+  }
+
+  // Het kanaal in Discord hoort de uitkomst ook te zien, met de stand van de
+  // stemming erbij. Mislukt die melding, dan is het besluit nog steeds genomen.
+  if (row) {
+    const { data: stemRijen } = await supabase
+      .from('application_votes')
+      .select('vote')
+      .eq('application_id', parsed.data.id);
+
+    await notifyDiscordStatus(row, {
+      ja: (stemRijen ?? []).filter((stem) => stem.vote === 'ja').length,
+      nee: (stemRijen ?? []).filter((stem) => stem.vote === 'nee').length,
+    });
   }
 
   revalidatePath('/leden');

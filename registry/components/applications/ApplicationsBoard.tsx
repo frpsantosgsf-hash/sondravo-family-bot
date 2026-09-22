@@ -21,18 +21,45 @@ interface Payload {
   error?: string;
 }
 
-const STATUS: Record<string, { label: string; ring: string; dot: string }> = {
-  nieuw: { label: 'Nieuw', ring: 'border-creme/35 text-creme', dot: 'bg-creme' },
-  in_behandeling: { label: 'In behandeling', ring: 'border-line text-muted', dot: 'bg-muted' },
+/**
+ * Elke status heeft zijn eigen kleur, en die loopt door de hele kaart: het
+ * streepje aan de zijkant, het bolletje en de tekst in de pil. Zo zie je in
+ * één oogopslag wat er aandacht vraagt, zonder te lezen.
+ *
+ * Oranje is bewust de enige kleur die nergens anders op de site voorkomt —
+ * daardoor springt een nieuwe sollicitatie er meteen uit.
+ */
+const STATUS: Record<
+  string,
+  { label: string; pil: string; stip: string; rand: string; vlak: string }
+> = {
+  nieuw: {
+    label: 'Nieuw',
+    pil: 'border-[#e0871f]/45 bg-[#e0871f]/10 text-[#f0ab5e]',
+    stip: 'bg-[#f0ab5e]',
+    rand: 'bg-[#e0871f]',
+    vlak: 'bg-[#e0871f]/[0.06]',
+  },
+  in_behandeling: {
+    label: 'In behandeling',
+    pil: 'border-creme/30 bg-creme/5 text-creme',
+    stip: 'bg-creme',
+    rand: 'bg-creme/70',
+    vlak: 'bg-creme/[0.03]',
+  },
   aangenomen: {
     label: 'Aangenomen',
-    ring: 'border-sondravo-green/50 text-[#7ddba3]',
-    dot: 'bg-[#7ddba3]',
+    pil: 'border-sondravo-green/50 bg-sondravo-green/10 text-[#7ddba3]',
+    stip: 'bg-[#7ddba3]',
+    rand: 'bg-[#2fa36b]',
+    vlak: 'bg-sondravo-green/[0.06]',
   },
   afgewezen: {
     label: 'Afgewezen',
-    ring: 'border-sondravo-red/40 text-[#f2a9ac]',
-    dot: 'bg-[#f2a9ac]',
+    pil: 'border-sondravo-red/40 bg-sondravo-red/10 text-[#f2a9ac]',
+    stip: 'bg-[#f2a9ac]',
+    rand: 'bg-sondravo-red',
+    vlak: 'bg-sondravo-red/[0.05]',
   },
 };
 
@@ -156,10 +183,18 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
         return (
           <li
             key={row.id}
-            className="overflow-hidden rounded-xl border border-line bg-panel"
+            className="relative overflow-hidden rounded-xl border border-line bg-panel"
           >
+            {/* Het streepje links draagt de statuskleur over de hele kaart. */}
+            <span
+              aria-hidden
+              className={`absolute inset-y-0 left-0 w-1 ${status.rand}`}
+            />
+
             {/* ---------- Kop ---------- */}
-            <div className="flex items-start gap-3.5 border-b border-line-soft bg-panel-high px-4 py-3.5 sm:px-5">
+            <div
+              className={`flex items-start gap-3.5 border-b border-line-soft px-4 py-3.5 pl-5 sm:px-5 sm:pl-6 ${status.vlak}`}
+            >
               {row.avatar_url ? (
                 <Image
                   src={row.avatar_url}
@@ -178,9 +213,9 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <p className="font-display text-base tracking-wide text-creme">{row.name}</p>
                   <span
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${status.ring}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${status.pil}`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} aria-hidden />
+                    <span className={`h-1.5 w-1.5 rounded-full ${status.stip}`} aria-hidden />
                     {status.label}
                   </span>
                 </div>
@@ -205,14 +240,14 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
             </div>
 
             {/* ---------- Inhoud ---------- */}
-            <div className="space-y-3.5 px-4 py-4 sm:px-5">
+            <div className="space-y-3.5 px-4 py-4 pl-5 sm:px-5 sm:pl-6">
               <Veld label="Waarom Sondravo" waarde={row.motivation} nadruk />
               <Veld label="Ervaring in FiveM" waarde={row.experience} />
               <Veld label="Wanneer online" waarde={row.availability} />
             </div>
 
             {/* ---------- Stemmen ---------- */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3 pl-5 sm:px-5 sm:pl-6">
               <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
                 Jouw stem
               </span>
@@ -241,7 +276,7 @@ export function ApplicationsBoard({ compact = false }: { compact?: boolean }) {
 
             {/* ---------- Beslissen (alleen Lead) ---------- */}
             {isAdmin ? (
-              <div className="border-t border-line-soft bg-panel-high px-4 py-3 sm:px-5">
+              <div className="border-t border-line-soft bg-panel-high px-4 py-3 pl-5 sm:px-5 sm:pl-6">
                 {row.handled_by ? (
                   <p className="mb-2.5 text-[11px] text-muted-soft">
                     Laatst behandeld door {row.handled_by}
