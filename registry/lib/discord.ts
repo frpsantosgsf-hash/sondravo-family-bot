@@ -141,3 +141,80 @@ export async function checkAdminRole(discordUserId: string): Promise<RoleCheck> 
     ? { status: 'admin' }
     : { status: 'not-admin' };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Hele ledenlijst koppelen                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface GuildMember {
+  discordUserId: string;
+  /** Servernaam (nickname), anders de globale naam, anders de handle. */
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * Haalt iedereen op die in de Discord-server zit.
+ *
+ * Discord geeft maximaal duizend leden per verzoek, dus we bladeren door tot
+ * de server op is. Voor een familie van deze omvang is dat één ronde.
+ */
+export async function fetchGuildMembers(): Promise<GuildMember[] | null> {
+  const config = getDiscordSyncConfig();
+  if (!config) return null;
+
+  const leden: GuildMember[] = [];
+  let na = '0';
+
+  for (let ronde = 0; ronde < 10; ronde += 1) {
+    const url = `${DISCORD_API}/guilds/${config.guildId}/members?limit=1000&after=${na}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { Authorization: `Bot ${config.botToken}` },
+        cache: 'no-store',
+      });
+    } catch {
+      return null;
+    }
+
+    if (!response.ok) return null;
+
+    const batch = (await response.json()) as DiscordMemberPayload[];
+    if (batch.length === 0) break;
+
+    for (const payload of batch) {
+      const user = payload.user;
+      if (!user?.id || !user.username) continue;
+
+      leden.push({
+        discordUserId: user.id,
+        displayName: payload.nick ?? user.global_name ?? user.username,
+        username: user.username,
+        avatarUrl: buildAvatarUrl(payload, config.guildId),
+      });
+    }
+
+    const laatste = batch[batch.length - 1]?.user?.id;
+    if (!laatste || batch.length < 1000) break;
+    na = laatste;
+  }
+
+  return leden;
+}
+
+/**
+ * Maakt een naam vergelijkbaar: kleine letters, zonder het SDF-voorvoegsel,
+ * zonder emoji's, leestekens of accenten. "SDF | Lahaye" en "lahaye" worden
+ * zo allebei "lahaye".
+ */
+export function normalizeName(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/^sdf\s*[|·•-]\s*/, '')
+    .replace(/[^a-z0-9]/g, '');
+}

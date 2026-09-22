@@ -23,6 +23,7 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
   );
   const handledRef = useRef<ActionResult | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [matching, setMatching] = useState(false);
 
   useEffect(() => {
     if (!state || state === handledRef.current) return;
@@ -35,6 +36,42 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
       toast(state.error, 'error');
     }
   }, [state, toast, onClose]);
+
+  /** Zoekt voor elk lid het Discord-account met dezelfde naam. */
+  async function runDiscordMatch() {
+    setMatching(true);
+    try {
+      const response = await fetch('/api/discord/match', { method: 'POST' });
+      const payload = (await response.json()) as {
+        error?: string;
+        gekoppeld?: number;
+        nietGevonden?: string[];
+        meerdereOpties?: string[];
+      };
+
+      if (!response.ok) {
+        toast(payload.error ?? 'Koppelen mislukt.', 'error');
+        return;
+      }
+
+      const rest: string[] = [];
+      if (payload.nietGevonden?.length) {
+        rest.push(`niet gevonden: ${payload.nietGevonden.join(', ')}`);
+      }
+      if (payload.meerdereOpties?.length) {
+        rest.push(`meerdere opties: ${payload.meerdereOpties.join(', ')}`);
+      }
+
+      toast(
+        `${payload.gekoppeld ?? 0} leden gekoppeld.${rest.length ? ` Nog te doen — ${rest.join('; ')}.` : ''}`,
+        payload.gekoppeld ? 'success' : 'info',
+      );
+    } catch {
+      toast('Koppelen mislukt. Probeer het later opnieuw.', 'error');
+    } finally {
+      setMatching(false);
+    }
+  }
 
   async function runDiscordSync() {
     setSyncing(true);
@@ -108,16 +145,40 @@ export function SettingsDialog({ open, settings, memberCount, onClose }: Setting
       <div className="mt-6 space-y-3 border-t border-line pt-5">
         <div>
           <h3 className="text-[12px] font-medium uppercase tracking-[0.14em] text-muted">
-            Discord-sync
+            Discord
           </h3>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
-            Haalt de actuele Discord-naam en avatar op voor elk lid met een Discord user ID.
-            Werkt alleen wanneer DISCORD_BOT_TOKEN en DISCORD_GUILD_ID ingesteld zijn.
+            <strong className="text-ink/80">Koppelen</strong> zoekt voor elk lid het Discord-account
+            met dezelfde naam, en zet daarna de foto en @naam automatisch op de lijst. Dat hoef je
+            maar één keer te doen.
+          </p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-soft">
+            <strong className="text-ink/80">Bijwerken</strong> haalt daarna nieuwe foto&apos;s en
+            naamswijzigingen op voor de leden die al gekoppeld zijn.
           </p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={runDiscordSync} loading={syncing}>
-          Nu synchroniseren
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={runDiscordMatch}
+            loading={matching}
+            disabled={syncing}
+          >
+            Koppelen aan Discord
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={runDiscordSync}
+            loading={syncing}
+            disabled={matching}
+          >
+            Foto&apos;s bijwerken
+          </Button>
+        </div>
       </div>
     </Modal>
   );
