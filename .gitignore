@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# geheimen — nooit in GitHub
+.env
+.env.local
+.env.*.local
+
+# logs
+npm-debug.log*
+*.log
+
+# os
+.DS_Store
+Thumbs.db
+
+# vercel
+.vercel
