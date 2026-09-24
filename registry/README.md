@@ -267,6 +267,7 @@ Alles staat met uitleg in `.env.example`. Kort samengevat:
 | `DISCORD_MEMBER_ROLE_ID` | — | **nee** | De familierol; bepaalt wie op de ledenlijst hoort |
 | `DISCORD_APPLICANT_ROLE_ID` | — | **nee** | Rol die toegang geeft tot het sollicitatieformulier |
 | `DISCORD_APPLICATION_WEBHOOK_URL` | — | **nee** | Webhook waar een nieuwe sollicitatie binnenkomt |
+| `CRON_SECRET` | — | **nee** | Geheim voor de nachtelijke rol-sync via Vercel Cron |
 | `BOT_API_SECRET` | — | **nee** | Gedeeld geheim tussen bot en website |
 | `NEXT_PUBLIC_SITE_URL` | — | ja | Correcte OAuth-redirects en deelkaarten |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | — | ja | De intro-clip op de voorpagina |

@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getMemberRoleId } from '@/lib/env';
 import {
   fetchGuildMembers,
@@ -40,6 +41,39 @@ export async function POST() {
     return NextResponse.json({ error: gate.error }, { status: 403 });
   }
 
+  return voerImportUit(await createClient());
+}
+
+/**
+ * Dezelfde import, maar dan door Vercel op een vast tijdstip aangeroepen.
+ *
+ * Vercel Cron stuurt een GET met `Authorization: Bearer $CRON_SECRET`. Zonder
+ * die sleutel — of zonder dat de sleutel gezet is — gebeurt er niets: dit
+ * adres mag nooit door een willekeurige bezoeker aangeroepen kunnen worden.
+ *
+ * Draait als service_role, want er is geen ingelogde admin bij een cronjob.
+ */
+export async function GET(request: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+
+  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Niet geautoriseerd.' }, { status: 401 });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json(
+      { error: 'SUPABASE_SERVICE_ROLE_KEY ontbreekt; de automatische sync kan niet schrijven.' },
+      { status: 503 },
+    );
+  }
+
+  return voerImportUit(createAdminClient());
+}
+
+/** De eigenlijke sync. Werkt met een adminsessie én met de service-role. */
+async function voerImportUit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<NextResponse> {
   if (!isDiscordSyncEnabled()) {
     return NextResponse.json(
       { error: 'Discord-koppeling staat uit. Zet DISCORD_BOT_TOKEN en DISCORD_GUILD_ID in Vercel.' },
@@ -80,8 +114,6 @@ export async function POST() {
     const rang = RANK_LADDER.find((r) => normalizeName(r.label) === kaal || r.key === kaal);
     if (rang) rangPerRolId.set(rolId, { key: rang.key, sortOrder: rang.sortOrder });
   }
-
-  const supabase = await createClient();
 
   const [{ data: leden, error: ledenError }, { data: koppelingen }] = await Promise.all([
     supabase.from('members').select('id, name, rank'),
@@ -227,20 +259,30 @@ export async function POST() {
       continue;
     }
 
-    // 3. Nog niet op de lijst: erbij zetten, met de servernaam als naam.
-    const { data: nieuwId, error } = await supabase.rpc('admin_save_member', {
-      p_id: null,
-      p_name: discordLid.displayName.slice(0, 64),
-      p_rank: rang,
-      p_discord_username: discordLid.username,
-      p_discord_user_id: discordLid.discordUserId,
-      p_phone: null,
-      p_avatar_url: discordLid.avatarUrl,
-      p_joined_at: null,
-      p_internal_note: null,
-    });
+    /*
+     * 3. Nog niet op de lijst: erbij zetten, met de servernaam als naam.
+     *
+     * Een gewone insert en niet admin_save_member, want die functie eist een
+     * ingelogde admin. De nachtelijke sync draait als service_role en zou daar
+     * op stuklopen. Het slug-veld vult de trigger zelf.
+     */
+    const { data: nieuw, error } = await supabase
+      .from('members')
+      .insert({
+        name: discordLid.displayName.slice(0, 64),
+        rank: rang,
+        discord_username: discordLid.username,
+        avatar_url: discordLid.avatarUrl,
+      })
+      .select('id')
+      .maybeSingle();
 
-    if (error || !nieuwId) {
+    if (error || !nieuw) {
+      mislukt.push(discordLid.displayName);
+      continue;
+    }
+
+    if (!(await koppelRij(nieuw.id, discordLid.discordUserId))) {
       mislukt.push(discordLid.displayName);
       continue;
     }
