@@ -30,37 +30,49 @@ on conflict (key) do update
 
 -- ---------------------------------------------------------------------------
 -- Current roster — 20 members.
--- `slug` is the idempotency key. Adding a member later through the app gets a
--- slug generated automatically by the members_set_slug trigger.
+--
+-- Deze lijst vult ALLEEN een leeg register. Dat is geen detail: sinds de
+-- rollen-sync bestaat wordt de ledenlijst gelijkgetrokken met Discord, en dan
+-- verdwijnt er soms iemand. Zou dit bestand daarna nog een keer draaien, dan
+-- stond die persoon er zo weer bij — met zijn oude rang, zonder dat iemand
+-- daarom vroeg. `on conflict (slug)` vangt dat niet af, want zijn rij is dan
+-- juist wég.
+--
+-- Staat er al iemand in het register, dan doet dit blok dus niets, en is
+-- setup.sql werkelijk zo veilig om opnieuw te draaien als hij belooft.
 -- ---------------------------------------------------------------------------
-insert into public.members (slug, name, rank) values
-  -- Mpitarika
-  ('lahaye',   'Lahaye',   'mpitarika'),
-  -- Lefitra
-  ('vito',     'Vito',     'lefitra'),
-  -- Mpanoro
-  ('ryan',     'Ryan',     'mpanoro'),
-  -- Mpifehy, Hery, Mpiady and Zoky have no members yet. Those ranks stay
-  -- hidden on the public page until somebody is placed in them.
-  -- Mpikambana
-  ('renzo',    'Renzo',    'mpikambana'),
-  ('levy',     'Levy',     'mpikambana'),
-  ('dave',     'Dave',     'mpikambana'),
-  ('gonzalo',  'Gonzalo',  'mpikambana'),
-  ('culms',    'Culms',    'mpikambana'),
-  ('bseah',    'Bseah',    'mpikambana'),
-  ('thomas',   'Thomas',   'mpikambana'),
-  ('rano',     'Rano',     'mpikambana'),
-  ('santos',   'Santos',   'mpikambana'),
-  ('baksteen', 'Baksteen', 'mpikambana'),
-  ('dishway',  'Dishway',  'mpikambana'),
-  -- Zazavao
-  ('ferry',    'Ferry',    'zazavao'),
-  ('rinnie',   'Rinnie',   'zazavao'),
-  ('jayden',   'Jayden',   'zazavao'),
-  ('tarik',    'Tarik',    'zazavao'),
-  ('zoef',     'Zoef',     'zazavao'),
-  ('xavier',   'Xavier',   'zazavao')
+insert into public.members (slug, name, rank)
+select v.slug, v.name, v.rank
+  from (values
+    -- Mpitarika
+    ('lahaye',   'Lahaye',   'mpitarika'),
+    -- Lefitra
+    ('vito',     'Vito',     'lefitra'),
+    -- Mpanoro
+    ('ryan',     'Ryan',     'mpanoro'),
+    -- Mpifehy, Hery, Mpiady and Zoky have no members yet. Those ranks stay
+    -- hidden on the public page until somebody is placed in them.
+    -- Mpikambana
+    ('renzo',    'Renzo',    'mpikambana'),
+    ('levy',     'Levy',     'mpikambana'),
+    ('dave',     'Dave',     'mpikambana'),
+    ('gonzalo',  'Gonzalo',  'mpikambana'),
+    ('culms',    'Culms',    'mpikambana'),
+    ('bseah',    'Bseah',    'mpikambana'),
+    ('thomas',   'Thomas',   'mpikambana'),
+    ('rano',     'Rano',     'mpikambana'),
+    ('santos',   'Santos',   'mpikambana'),
+    ('baksteen', 'Baksteen', 'mpikambana'),
+    ('dishway',  'Dishway',  'mpikambana'),
+    -- Zazavao
+    ('ferry',    'Ferry',    'zazavao'),
+    ('rinnie',   'Rinnie',   'zazavao'),
+    ('jayden',   'Jayden',   'zazavao'),
+    ('tarik',    'Tarik',    'zazavao'),
+    ('zoef',     'Zoef',     'zazavao'),
+    ('xavier',   'Xavier',   'zazavao')
+) as v(slug, name, rank)
+ where not exists (select 1 from public.members)
 on conflict (slug) do nothing;
 
 -- ---------------------------------------------------------------------------
