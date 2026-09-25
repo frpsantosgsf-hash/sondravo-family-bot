@@ -11,6 +11,17 @@ export function displayName(name: string): string {
   return `${NAME_PREFIX} | ${clean}`;
 }
 
+/**
+ * De naam zonder het SDF-voorvoegsel.
+ *
+ * Op de site hoort het prefix erbij; in een Discord-bericht is het alleen
+ * ruis, en nog ongelijk ook — sommige leden dragen het in het register wel en
+ * anderen niet, waardoor een opsomming er rommelig uitziet.
+ */
+export function plainName(name: string): string {
+  return name.replace(/^sdf\s*\|\s*/i, '').trim();
+}
+
 export function initials(name: string): string {
   const parts = name
     .replace(/^sdf\s*\|\s*/i, '')

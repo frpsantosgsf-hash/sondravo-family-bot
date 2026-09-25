@@ -160,6 +160,17 @@ const VOLLEDIG = new Intl.DateTimeFormat('nl-NL', {
   timeZone: 'UTC',
 });
 
+const DAG_MAAND_LANG = new Intl.DateTimeFormat('nl-NL', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+});
+
+/** '25 september' — voor een periode waar het jaartal maar één keer hoeft. */
+export function datumZonderJaar(datum: string): string {
+  return DAG_MAAND_LANG.format(naarUtc(datum));
+}
+
 export function volledigeDatum(datum: string): string {
   return VOLLEDIG.format(naarUtc(datum));
 }

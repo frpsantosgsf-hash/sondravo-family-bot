@@ -5,10 +5,14 @@ import {
   getDiscordSyncConfig,
   getGangpotChannelId,
   getGangpotWebhookUrl,
+  getSiteUrl,
   hasServiceRoleKey,
   isSupabaseConfigured,
 } from '@/lib/env';
+import { plainName } from '@/lib/format';
 import {
+  dagenTot,
+  datumZonderJaar,
   deadlineVan,
   geld,
   laatsteDatum,
@@ -73,7 +77,9 @@ async function haalWeekstand(vrijdag: string): Promise<Weekstand | null> {
         : eersteVrijdag;
 
     if (vrijdag < sinds) continue;
-    (betaaldDezeWeek.has(lid.id) ? betaald : open).push(lid.name);
+    // Zonder het SDF-voorvoegsel: dat draagt niet iedereen in het register, en
+    // een opsomming waarin de helft het wel heeft leest slordig.
+    (betaaldDezeWeek.has(lid.id) ? betaald : open).push(plainName(lid.name));
   }
 
   const totaalBijdragen = (bijdragen.data ?? []).reduce((som, rij) => som + Number(rij.amount), 0);
@@ -108,43 +114,72 @@ function lijst(namen: string[]): string {
   return `${tekst} … en nog ${namen.length - getoond}`;
 }
 
+/**
+ * Een balk van twintig blokjes.
+ *
+ * Een getal moet je lezen en vergelijken; een balk zie je. In een kanaal waar
+ * mensen langs scrollen is dat het verschil tussen wel en niet opvallen.
+ */
+function balk(deel: number, geheel: number): string {
+  const vol = geheel === 0 ? 0 : Math.round((deel / geheel) * 20);
+  return '█'.repeat(vol) + '░'.repeat(20 - vol);
+}
+
 function bouwEmbed(stand: Weekstand): Record<string, unknown> {
   const totaal = stand.betaald.length + stand.open.length;
   const alles = stand.open.length === 0 && totaal > 0;
+  const deadline = deadlineVan(stand.vrijdag);
+  const dagen = dagenTot(deadline);
+
+  const velden: Record<string, unknown>[] = [];
+
+  /*
+   * Wie nog moet betalen staat bovenaan, niet onderaan. Dit bericht is er om
+   * die mensen aan te zetten; wie al betaald heeft leest toch alleen of hij er
+   * niet meer bij staat.
+   */
+  if (!alles) {
+    velden.push({
+      name: `⭕  Nog open — ${stand.open.length} · ${geld(stand.open.length * stand.bijdrage)}`,
+      value: lijst(stand.open),
+    });
+  }
+
+  velden.push({
+    name: `✅  Betaald — ${stand.betaald.length}`,
+    value: lijst(stand.betaald),
+  });
+
+  velden.push(
+    { name: '🏦  In de pot', value: geld(stand.saldo), inline: true },
+    {
+      name: '📥  Deze week binnen',
+      value: geld(stand.betaald.length * stand.bijdrage),
+      inline: true,
+    },
+  );
 
   return {
     title: `💰  Gangpot — week ${weeknummer(stand.vrijdag)}`,
+    // De titel wordt een link, zodat je vanuit Discord meteen op de juiste
+    // pagina staat in plaats van hem te moeten opzoeken.
+    url: `${getSiteUrl()}/gangpot`,
     description: [
-      `Vrijdag ${volledigeDatum(stand.vrijdag)} · **${geld(stand.bijdrage)}** per lid`,
+      `Vrijdag ${datumZonderJaar(stand.vrijdag)} t/m vrijdag ${volledigeDatum(deadline)}`,
+      `**${geld(stand.bijdrage)}** per lid`,
+      '',
+      `\`${balk(stand.betaald.length, totaal)}\`  **${stand.betaald.length} / ${totaal}**`,
+      '',
       alles
-        ? '**Iedereen heeft betaald.** Mooi werk.'
-        : `Nog **${stand.open.length}** van de **${totaal}** te gaan — betalen kan tot vrijdag ${volledigeDatum(
-            deadlineVan(stand.vrijdag),
-          )}.`,
+        ? '🎉  **Iedereen heeft betaald.** Mooi werk.'
+        : dagen > 0
+          ? `Nog **${dagen}** ${dagen === 1 ? 'dag' : 'dagen'} om in te leggen.`
+          : 'Vandaag is de laatste dag om in te leggen.',
     ].join('\n'),
     // Groen zodra de week rond is, anders oranje: dezelfde taal als de site.
     color: alles ? 0x2fa36b : 0xe0871f,
-    fields: [
-      {
-        name: `✅  Betaald (${stand.betaald.length})`,
-        value: lijst(stand.betaald),
-      },
-      {
-        name: `⭕  Nog open (${stand.open.length})`,
-        value: lijst(stand.open),
-      },
-      {
-        name: '🏦  Saldo',
-        value: geld(stand.saldo),
-        inline: true,
-      },
-      {
-        name: '📥  Deze week binnen',
-        value: geld(stand.betaald.length * stand.bijdrage),
-        inline: true,
-      },
-    ],
-    footer: { text: 'The Sondravo Family · bijgewerkt' },
+    fields: velden,
+    footer: { text: 'The Sondravo Family · dit bericht werkt zichzelf bij' },
     timestamp: new Date().toISOString(),
   };
 }
@@ -184,10 +219,11 @@ function botKanaal(channelId: string, botToken: string): Kanaal {
       return typeof payload.id === 'string' ? payload.id : null;
     },
     async bewerk(messageId, embed) {
-      const response = await fetch(
-        `${DISCORD_API}/channels/${channelId}/messages/${messageId}`,
-        { method: 'PATCH', headers, body: lichaam(embed) },
-      );
+      const response = await fetch(`${DISCORD_API}/channels/${channelId}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers,
+        body: lichaam(embed),
+      });
       if (response.ok) return 'ok';
       return response.status === 404 ? 'weg' : 'mislukt';
     },
