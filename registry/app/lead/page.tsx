@@ -107,7 +107,7 @@ export default async function LeadPage() {
           />
 
           <Kerncijfers
-            saldo={gangpot.totals.balance}
+            saldo={gangpot.error ? null : gangpot.totals.balance}
             leden={members.length}
             limiet={settings.memberLimit}
             openstaand={gangpot.totals.outstanding}

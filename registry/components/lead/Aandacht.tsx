@@ -55,6 +55,22 @@ export function Aandacht({
 }) {
   const punten: Punt[] = [];
 
+  /*
+   * Een storing hoort bovenaan. Zonder deze regel zou de leadkamer alleen
+   * nullen laten zien, en die lezen als "er staat niets open" in plaats van
+   * "ik kon niet kijken".
+   */
+  if (gangpot.error) {
+    punten.push({
+      sleutel: 'storing',
+      titel: 'De gangpot is nog niet klaar',
+      uitleg: gangpot.error,
+      href: '/gangpot',
+      toon: 'rood',
+      icoon: 'munt',
+    });
+  }
+
   if (overzicht.nieuweSollicitaties > 0) {
     punten.push({
       sleutel: 'nieuw',
@@ -129,7 +145,7 @@ export function Aandacht({
     });
   }
 
-  if (punten.length === 0) {
+  if (punten.length === 0 && !gangpot.error) {
     return (
       <div className="panel flex items-center gap-4 border border-sondravo-green/25 bg-sondravo-green/[0.05] px-5 py-5">
         <span

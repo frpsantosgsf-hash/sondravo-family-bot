@@ -22,7 +22,8 @@ export function Kerncijfers({
   openstaand,
   dezeWeek,
 }: {
-  saldo: number;
+  /** null wanneer de gangpot niet gelezen kon worden. Nul is dan een leugen. */
+  saldo: number | null;
   leden: number;
   limiet: number;
   openstaand: number;
@@ -32,10 +33,15 @@ export function Kerncijfers({
   const cijfers: Cijfer[] = [
     {
       label: 'In de pot',
-      waarde: geld(saldo),
-      bij: openstaand > 0 ? `${geld(openstaand)} nog te betalen` : 'iedereen is bij',
+      waarde: saldo === null ? '—' : geld(saldo),
+      bij:
+        saldo === null
+          ? 'nog niet op te halen'
+          : openstaand > 0
+            ? `${geld(openstaand)} nog te betalen`
+            : 'iedereen is bij',
       href: '/gangpot',
-      toon: 'groen',
+      toon: saldo === null ? 'creme' : 'groen',
     },
     {
       label: 'Leden',

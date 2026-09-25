@@ -92,18 +92,45 @@ export default async function GangpotPage() {
 
         <MobieleLinks current="/gangpot" isAdmin={access.isAdmin} />
 
+        {/*
+          Bij een storing helemaal geen overzicht tonen.
+          Een saldokaart vol nullen naast een foutmelding leest als "de pot is
+          leeg" terwijl er niets gelezen kón worden — en dan ga je afvinken
+          zoeken dat er niet is. Liever eerlijk niets, met de reden erbij.
+        */}
         {gangpot.error ? (
-          <p
+          <div
             role="alert"
-            className="mt-6 rounded-lg border border-sondravo-red/35 bg-sondravo-red/10 px-4 py-3 text-sm leading-relaxed text-[#f2a9ac]"
+            className="panel mt-6 border border-sondravo-red/35 bg-sondravo-red/[0.07] px-5 py-6 sm:px-6"
           >
-            {gangpot.error}
-          </p>
-        ) : null}
+            <p className="font-display text-sm uppercase tracking-[0.12em] text-[#f2a9ac]">
+              De gangpot is nog niet klaar
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-ink/80">{gangpot.error}</p>
 
-        <div className="mt-6 sm:mt-8">
-          <GangpotBoard initial={gangpot} ranks={ranks} />
-        </div>
+            {access.isAdmin ? (
+              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                Draai in de Supabase SQL Editor eerst{' '}
+                <code className="rounded bg-void/60 px-1.5 py-0.5 text-[12px] text-creme">
+                  0016_gangpot.sql
+                </code>{' '}
+                en daarna{' '}
+                <code className="rounded bg-void/60 px-1.5 py-0.5 text-[12px] text-creme">
+                  0017_gangpot_beginstand.sql
+                </code>
+                . Daarna staat de hele ledenlijst hier klaar om af te vinken.
+              </p>
+            ) : (
+              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                Een Lead moet dit nog afronden. Probeer het later opnieuw.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-6 sm:mt-8">
+            <GangpotBoard initial={gangpot} ranks={ranks} />
+          </div>
+        )}
       </main>
 
       <SiteFooter familyName={settings.familyName} />
