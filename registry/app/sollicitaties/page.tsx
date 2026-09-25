@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SiteNav } from '@/components/site/SiteNav';
+import { MobieleLinks } from '@/components/site/MobieleLinks';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { AuthControls } from '@/components/site/AuthControls';
 import { ApplicationsPanel } from '@/components/applications/ApplicationsPanel';
@@ -75,12 +76,7 @@ export default async function SollicitatiesPage() {
           </p>
         </header>
 
-        <Link
-          href="/leden"
-          className="tap-target mt-5 inline-flex items-center gap-2 rounded-lg border border-line bg-panel-high px-4 text-[13px] uppercase tracking-[0.14em] text-ink transition-colors hover:border-creme/25 sm:hidden"
-        >
-          Naar de ledenlijst
-        </Link>
+        <MobieleLinks current="/sollicitaties" isAdmin={access.isAdmin} />
 
         <div className="mt-6 sm:mt-8">
           <ApplicationsPanel isAdmin={viewer?.isAdmin === true} />

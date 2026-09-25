@@ -6,7 +6,7 @@ import type { Viewer } from '@/types';
 interface SiteNavProps {
   viewer: Viewer | null;
   /** Huidige pagina, bepaalt de actieve link en waar login naartoe stuurt. */
-  current: '/' | '/leden' | '/gangpot' | '/solliciteren' | '/sollicitaties';
+  current: '/' | '/lead' | '/leden' | '/gangpot' | '/solliciteren' | '/sollicitaties';
   /** De ledenlijst staat alleen in het menu voor wie hem ook mag openen. */
   showRegistry?: boolean;
 }
@@ -27,6 +27,20 @@ export function SiteNav({ viewer, current, showRegistry = true }: SiteNavProps) 
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* De leadkamer staat vooraan, maar alleen voor wie hem heeft. */}
+          {showRegistry && viewer?.isAdmin ? (
+            <Link
+              href="/lead"
+              aria-current={current === '/lead' ? 'page' : undefined}
+              className={`tap-target hidden items-center rounded-lg px-3 text-[13px] font-medium uppercase tracking-[0.16em] transition-all duration-150 sm:inline-flex ${
+                current === '/lead'
+                  ? 'bg-creme/10 text-creme'
+                  : 'text-muted hover:bg-panel-high hover:text-ink'
+              }`}
+            >
+              Lead
+            </Link>
+          ) : null}
           {showRegistry ? (
             <Link
               href="/leden"

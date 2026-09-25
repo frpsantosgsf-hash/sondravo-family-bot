@@ -90,7 +90,7 @@ export default async function GangpotPage() {
           </p>
         </header>
 
-        <MobieleLinks current="/gangpot" />
+        <MobieleLinks current="/gangpot" isAdmin={access.isAdmin} />
 
         {gangpot.error ? (
           <p

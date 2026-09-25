@@ -47,6 +47,19 @@ Lead/Admin-accounts kunnen iets wijzigen.
 - Teller `20 / 20 MEMBERS` — het aantal komt uit de database, de limiet uit
   `settings` en is door een admin aanpasbaar
 
+### Leadkamer (`/lead`) — alleen voor Lead/Admin
+Eén scherm met alles wat vandaag aandacht vraagt, zodat de leiding niet drie
+pagina's en een instellingenvenster hoeft af te gaan.
+- **Vraagt aandacht** — alleen wat écht iets vraagt: nieuwe sollicitaties,
+  gesloten stemmingen die op een besluit wachten, leden die deze week nog niet
+  betaald hebben, en leden zonder Discord-koppeling (die komen zelf de site
+  niet op). Is alles bij, dan staat er één rustige groene regel
+- **Kerncijfers** — saldo, ledenaantal en de stand van deze week, elk een link
+  naar de pagina erachter
+- **Snelle acties** — rollen ophalen, sollicitaties open of dicht, en het
+  gangpot-bericht naar Discord sturen
+- **Laatste activiteit** — de zes meest recente regels uit het logboek
+
 ### Gangpot (`/gangpot`) — alleen voor de familie
 De kas van de familie, waar eerst een spreadsheet voor rondging.
 - **Saldo** bovenaan: beginsaldo, ontvangen, uitgegeven en wat er nog openstaat.
@@ -81,6 +94,7 @@ registry/
 │   ├── page.tsx                 Voorpagina (logo, clip, teller)
 │   ├── leden/page.tsx           De ledenlijst
 │   ├── gangpot/page.tsx         De kas: bijdragen, kasboek, saldo
+│   ├── lead/page.tsx            Leadkamer: wat vandaag aandacht vraagt
 │   ├── auth/                    Discord OAuth: login, callback, signout, error
 │   ├── api/gangpot/            Afvinken, boeken, wekelijkse Discord-melding
 │   ├── api/discord/sync/        Optionele Discord-sync (alleen admins)
@@ -91,6 +105,7 @@ registry/
 │   ├── site/                    Navigatie, logo, clip, capaciteitsmeter
 │   ├── registry/                Ledenlijst, rijen, rangen, zoekbalk
 │   ├── gangpot/                 Saldokaart, weeklijst, kasboek, historie
+│   ├── lead/                    Aandachtslijst, kerncijfers, snelle acties
 │   ├── admin/                   Modals: lid, verwijderen, history, settings
 │   └── ui/                      Knoppen, velden, modal, toasts, skeletons
 ├── lib/
@@ -99,6 +114,7 @@ registry/
 │   ├── actions.ts               Alle schrijfacties (server actions)
 │   ├── auth.ts                  Server-side adminchecks
 │   ├── gangpot.ts               De gangpot lezen en het saldo uitrekenen
+│   ├── lead.ts                  De losse eindjes voor de leadkamer
 │   ├── weken.ts                 Betaalvrijdagen, weeknummers, bedragen
 │   ├── ranks.ts                 De rangladder + kleurtoon per rang
 │   ├── discord.ts               Discord API (server-only)

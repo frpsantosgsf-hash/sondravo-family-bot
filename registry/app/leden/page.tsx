@@ -91,7 +91,7 @@ export default async function LedenPage() {
           </p>
         ) : null}
 
-        <MobieleLinks current="/leden" />
+        <MobieleLinks current="/leden" isAdmin={access.isAdmin} />
 
         <div className="mt-6 sm:mt-8">
           <RegistryView members={members} ranks={ranks} settings={settings} viewer={viewer} />
