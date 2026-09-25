@@ -164,6 +164,90 @@ export interface Database {
         };
         Relationships: [];
       };
+      pot_settings: {
+        Row: {
+          id: number;
+          opening_balance: number;
+          weekly_amount: number;
+          first_friday: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: {
+          opening_balance?: number;
+          weekly_amount?: number;
+          first_friday?: string;
+        };
+        Relationships: [];
+      };
+      pot_contributions: {
+        Row: {
+          id: string;
+          member_id: string | null;
+          member_name: string | null;
+          week_friday: string;
+          amount: number;
+          marked_by: string | null;
+          marked_at: string;
+        };
+        // Naam, bedrag en "wie vinkte af" vult de database zelf in.
+        Insert: {
+          member_id: string;
+          week_friday: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      pot_expenses: {
+        Row: {
+          id: string;
+          spent_on: string;
+          description: string;
+          paid_by: string | null;
+          amount: number;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          spent_on: string;
+          description: string;
+          paid_by?: string | null;
+          amount: number;
+          note?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['pot_expenses']['Insert']>;
+        Relationships: [];
+      };
+      pot_income: {
+        Row: {
+          id: string;
+          received_on: string;
+          description: string;
+          source: string | null;
+          amount: number;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          received_on: string;
+          description: string;
+          source?: string | null;
+          amount: number;
+          note?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['pot_income']['Insert']>;
+        Relationships: [];
+      };
+      pot_week_messages: {
+        Row: { week_friday: string; message_id: string; updated_at: string };
+        Insert: { week_friday: string; message_id: string; updated_at?: string };
+        Update: { message_id?: string; updated_at?: string };
+        Relationships: [];
+      };
       application_votes: {
         Row: {
           application_id: string;
@@ -224,6 +308,10 @@ export interface Database {
         Args: Record<never, never>;
         Returns: boolean;
       };
+      current_member_id: {
+        Args: Record<never, never>;
+        Returns: string | null;
+      };
       application_accepts_votes: {
         Args: { p_id: string };
         Returns: boolean;
@@ -282,3 +370,7 @@ export type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
 export type PrivateMemberRow = Database['public']['Tables']['private_member_data']['Row'];
 export type ApplicationRow = Database['public']['Tables']['applications']['Row'];
 export type ApplicationVoteRow = Database['public']['Tables']['application_votes']['Row'];
+export type PotSettingsRow = Database['public']['Tables']['pot_settings']['Row'];
+export type PotContributionRow = Database['public']['Tables']['pot_contributions']['Row'];
+export type PotExpenseRow = Database['public']['Tables']['pot_expenses']['Row'];
+export type PotIncomeRow = Database['public']['Tables']['pot_income']['Row'];

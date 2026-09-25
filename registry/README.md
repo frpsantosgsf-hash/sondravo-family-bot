@@ -1,9 +1,9 @@
 # The Sondravo Family — Official Family Registry
 
 De officiële website van The Sondravo Family: een voorpagina met ons logo en
-onze intro-clip, en daarachter een publieke ledenlijst per rang. Iedereen met
-de link kan de lijst bekijken. Alleen goedgekeurde Lead/Admin-accounts kunnen
-iets wijzigen.
+onze intro-clip, en daarachter de besloten kant — ledenlijst, gangpot en
+sollicitaties. Alleen wie zelf op de ledenlijst staat komt daar binnen; alleen
+Lead/Admin-accounts kunnen iets wijzigen.
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase
 (PostgreSQL + Auth + Row Level Security) · Vercel
@@ -37,7 +37,7 @@ iets wijzigen.
 - Live ledenteller met capaciteitsbalk
 - Knop naar de ledenlijst
 
-### Ledenlijst (`/leden`) — publiek, zonder account
+### Ledenlijst (`/leden`) — alleen voor de familie
 - Alle leden, automatisch gegroepeerd per rang
 - Rangen in vaste volgorde (nooit alfabetisch), elk in de kleur van zijn
   Discord-rol — gedempt, zodat de lijst rustig blijft
@@ -46,6 +46,22 @@ iets wijzigen.
 - Realtime zoeken op naam, Discord of rang + filter per rang
 - Teller `20 / 20 MEMBERS` — het aantal komt uit de database, de limiet uit
   `settings` en is door een admin aanpasbaar
+
+### Gangpot (`/gangpot`) — alleen voor de familie
+De kas van de familie, waar eerst een spreadsheet voor rondging.
+- **Saldo** bovenaan: beginsaldo, ontvangen, uitgegeven en wat er nog openstaat.
+  Het saldo wordt élke keer opnieuw uitgerekend en nergens opgeslagen, zodat er
+  geen tweede waarheid kan ontstaan
+- **Deze week** — alle leden onder elkaar met één knop *Betaald / Open*. Geen
+  raster van twintig leden bij achttien weken: dat past op geen telefoon
+- **Kasboek** — uitgaven en inkomsten, elk in een eigen lijst zodat een
+  verkeerd voorteken onmogelijk is
+- **Historie** — per lid een rij bolletjes, zwaarste achterstand bovenaan
+- Leden lezen mee, alleen de Lead vinkt af en boekt
+- Elke vrijdagochtend één bericht in Discord dat zichzelf bijwerkt zodra er
+  iemand wordt afgevinkt
+- Wie de familie verlaat verdwijnt uit de ledenlijst, maar zijn betalingen
+  blijven met naam in de boeken staan
 
 ### Admin-modus — dezelfde pagina, extra knoppen
 Zodra een Lead inlogt verschijnen op diezelfde ledenlijst:
@@ -64,7 +80,9 @@ registry/
 ├── app/
 │   ├── page.tsx                 Voorpagina (logo, clip, teller)
 │   ├── leden/page.tsx           De ledenlijst
+│   ├── gangpot/page.tsx         De kas: bijdragen, kasboek, saldo
 │   ├── auth/                    Discord OAuth: login, callback, signout, error
+│   ├── api/gangpot/            Afvinken, boeken, wekelijkse Discord-melding
 │   ├── api/discord/sync/        Optionele Discord-sync (alleen admins)
 │   ├── api/bot/member/          Endpoint voor /new en /verwijder in Discord
 │   ├── opengraph-image.tsx      Deelkaart met ons logo
@@ -72,6 +90,7 @@ registry/
 ├── components/
 │   ├── site/                    Navigatie, logo, clip, capaciteitsmeter
 │   ├── registry/                Ledenlijst, rijen, rangen, zoekbalk
+│   ├── gangpot/                 Saldokaart, weeklijst, kasboek, historie
 │   ├── admin/                   Modals: lid, verwijderen, history, settings
 │   └── ui/                      Knoppen, velden, modal, toasts, skeletons
 ├── lib/
@@ -79,6 +98,8 @@ registry/
 │   ├── data.ts                  Alle leesqueries
 │   ├── actions.ts               Alle schrijfacties (server actions)
 │   ├── auth.ts                  Server-side adminchecks
+│   ├── gangpot.ts               De gangpot lezen en het saldo uitrekenen
+│   ├── weken.ts                 Betaalvrijdagen, weeknummers, bedragen
 │   ├── ranks.ts                 De rangladder + kleurtoon per rang
 │   ├── discord.ts               Discord API (server-only)
 │   └── video.ts                 YouTube/bestand-herkenning voor de clip
@@ -121,7 +142,7 @@ wat een admin heeft aangepast blijft staan.
 <details>
 <summary>Liever de losse migraties?</summary>
 
-`setup.sql` is samengesteld uit de zeven bestanden in `supabase/migrations/`.
+`setup.sql` wordt samengesteld uit de bestanden in `supabase/migrations/`.
 Die kun je ook los draaien, **in deze volgorde**:
 
 | # | Bestand | Wat het doet |
@@ -133,8 +154,24 @@ Die kun je ook los draaien, **in deze volgorde**:
 | 5 | `0005_rank_colors.sql` | De kleur van elke Discord-rol |
 | 6 | `0006_discord_admin_roles.sql` | Beheerrechten via de Leader-rol |
 | 7 | `0007_fixes.sql` | Twee reparaties — overslaan kan niet |
+| 8 | `0008_service_role_grants.sql` | Rechten voor de service-role |
+| 9 | `0009_applications.sql` | Sollicitaties: tabel, RLS en insturen |
+| 10 | `0010_private_registry.sql` | De ledenlijst wordt besloten |
+| 11 | `0011_fix_submit_application.sql` | Rolcheck in `submit_application` |
+| 12 | `0012_application_votes.sql` | Stemmen van leden over een sollicitatie |
+| 13 | `0013_applications_lifecycle.sql` | Stemming sluiten, archiveren, deur dicht |
+| 14 | `0014_review_fixes.sql` | Twee gaten uit de review |
+| 15 | `0015_review_fixes_2.sql` | Rolcheck bot-functies, bericht-ID wisbaar |
+| 16 | `0016_gangpot.sql` | De gangpot: bijdragen, kasboek, saldo |
 
-Pas je iets aan in `migrations/`, genereer `setup.sql` dan opnieuw.
+`0017_gangpot_beginstand.sql` staat er bewust **niet** in: die zet eenmalig de
+stand uit de oude spreadsheet over (beginsaldo, de betaalde weken 36 t/m 39 en
+de drie uitgaven). Draai hem één keer, apart, ná `setup.sql`. Onderaan laat hij
+zien welke namen uit het bestand niet op de ledenlijst gevonden zijn — die zijn
+overgeslagen en vink je met de hand af op `/gangpot`.
+
+Pas je iets aan in `migrations/`, draai dan `npm run build:setup` om
+`setup.sql` opnieuw samen te stellen.
 
 </details>
 
@@ -267,7 +304,8 @@ Alles staat met uitleg in `.env.example`. Kort samengevat:
 | `DISCORD_MEMBER_ROLE_ID` | — | **nee** | De familierol; bepaalt wie op de ledenlijst hoort |
 | `DISCORD_APPLICANT_ROLE_ID` | — | **nee** | Rol die toegang geeft tot het sollicitatieformulier |
 | `DISCORD_APPLICATION_WEBHOOK_URL` | — | **nee** | Webhook waar een nieuwe sollicitatie binnenkomt |
-| `CRON_SECRET` | — | **nee** | Geheim voor de nachtelijke rol-sync via Vercel Cron |
+| `DISCORD_GANGPOT_WEBHOOK_URL` | — | **nee** | Webhook voor het wekelijkse gangpot-bericht |
+| `CRON_SECRET` | — | **nee** | Geheim voor de nachtelijke rol-sync én de vrijdagse gangpot-melding |
 | `BOT_API_SECRET` | — | **nee** | Gedeeld geheim tussen bot en website |
 | `NEXT_PUBLIC_SITE_URL` | — | ja | Correcte OAuth-redirects en deelkaarten |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | — | ja | De intro-clip op de voorpagina |

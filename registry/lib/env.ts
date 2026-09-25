@@ -14,6 +14,9 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const SUPABASE_CONFIG_ERROR =
   'Supabase is nog niet geconfigureerd. Zet NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY in je environment variables.';
 
+/** Is de service role-sleutel beschikbaar? Voor code die stil moet kunnen overslaan. */
+export const hasServiceRoleKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 /** Alleen server-side aanroepen. Gooit wanneer de key ontbreekt. */
 export function getServiceRoleKey(): string {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -67,6 +70,19 @@ export function getApplicantRoleId(): string | null {
  */
 export function getApplicationWebhookUrl(): string | null {
   const url = String(process.env.DISCORD_APPLICATION_WEBHOOK_URL ?? '').trim();
+  return url.startsWith('https://discord.com/api/webhooks/') ||
+    url.startsWith('https://discordapp.com/api/webhooks/')
+    ? url
+    : null;
+}
+
+/**
+ * Discord-webhook voor de wekelijkse gangpot-melding. Een eigen webhook en
+ * niet die van de sollicitaties: de kas hoort in het kanaal van de familie,
+ * niet bij de aanmeldingen. Leeg = geen melding in Discord.
+ */
+export function getGangpotWebhookUrl(): string | null {
+  const url = String(process.env.DISCORD_GANGPOT_WEBHOOK_URL ?? '').trim();
   return url.startsWith('https://discord.com/api/webhooks/') ||
     url.startsWith('https://discordapp.com/api/webhooks/')
     ? url

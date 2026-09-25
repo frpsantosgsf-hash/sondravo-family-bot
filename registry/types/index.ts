@@ -76,3 +76,78 @@ export interface AuditEntry {
 export type ActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/* ---------------------------------------------------------------------------
+   Gangpot
+   --------------------------------------------------------------------------- */
+
+/** Wat een lid in één week gedaan heeft. */
+export type PotWeekStatus = 'betaald' | 'open' | 'nvt';
+
+export interface PotWeek {
+  /** De vrijdag van deze week, als 'JJJJ-MM-DD'. */
+  friday: string;
+  weekNumber: number;
+  /** Hoeveel leden betaald hebben. */
+  paid: number;
+  /** Hoeveel leden deze week hoorden te betalen. */
+  due: number;
+  /** Wat er binnenkwam. */
+  received: number;
+}
+
+export interface PotMember {
+  id: string;
+  name: string;
+  rank: string;
+  avatarUrl: string | null;
+  /** De eerste vrijdag waarop dit lid meetelt. */
+  since: string;
+  /** Status per vrijdag, gesleuteld op de datum. */
+  weeks: Record<string, PotWeekStatus>;
+  openWeeks: number;
+  openAmount: number;
+}
+
+/** Een uitgave of een inkomst — dezelfde vorm, zodat de UI er één lijst van maakt. */
+export interface PotEntry {
+  id: string;
+  date: string;
+  description: string;
+  /** "Betaald door" bij een uitgave, "bron" bij een inkomst. */
+  who: string | null;
+  amount: number;
+  note: string | null;
+  createdBy: string | null;
+}
+
+export interface PotTotals {
+  /** Beginsaldo uit de instellingen. */
+  opening: number;
+  /** Binnengekomen wekelijkse bijdragen. */
+  contributions: number;
+  /** Overige inkomsten. */
+  income: number;
+  expenses: number;
+  /** Nog te betalen bijdragen. Zit níét in het saldo. */
+  outstanding: number;
+  /** Wat er nu in de pot zit. */
+  balance: number;
+}
+
+export interface PotData {
+  weeklyAmount: number;
+  openingBalance: number;
+  firstFriday: string;
+  currentFriday: string;
+  weeks: PotWeek[];
+  members: PotMember[];
+  expenses: PotEntry[];
+  income: PotEntry[];
+  totals: PotTotals;
+  /** Het lid dat de bezoeker zelf is, voor zover bekend. */
+  meId: string | null;
+  isAdmin: boolean;
+  /** Gezet wanneer de gegevens niet geladen konden worden. */
+  error: string | null;
+}

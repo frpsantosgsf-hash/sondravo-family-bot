@@ -138,8 +138,40 @@ export function describeAuditEntry(
       }
       return `${actor} wijzigde de instellingen`;
     }
+    case 'pot.contribution.added':
+      return `${actor} vinkte ${member} af als betaald`;
+    case 'pot.contribution.removed':
+      return `${actor} zette ${member} terug op open`;
+    case 'pot.contribution.updated': {
+      // Dit gebeurt in de praktijk maar één keer: als iemand de familie
+      // verlaat en zijn betaalregels losgekoppeld worden van de ledenlijst.
+      const was = readString(entry.oldValue, 'member_id');
+      const nu = readString(entry.newValue, 'member_id');
+      if (was && !nu) return `${member} verliet de familie; zijn betaalhistorie blijft staan`;
+      return `${actor} wijzigde de betaalhistorie van ${member}`;
+    }
+    case 'pot.expense.added':
+      return `${actor} boekte een uitgave${beschrijf(entry.newValue)}`;
+    case 'pot.expense.updated':
+      return `${actor} wijzigde een uitgave${beschrijf(entry.newValue)}`;
+    case 'pot.expense.removed':
+      return `${actor} verwijderde een uitgave${beschrijf(entry.oldValue)}`;
+    case 'pot.income.added':
+      return `${actor} boekte een inkomst${beschrijf(entry.newValue)}`;
+    case 'pot.income.updated':
+      return `${actor} wijzigde een inkomst${beschrijf(entry.newValue)}`;
+    case 'pot.income.removed':
+      return `${actor} verwijderde een inkomst${beschrijf(entry.oldValue)}`;
+    case 'pot.settings.updated':
+      return `${actor} wijzigde de instellingen van de gangpot`;
     case 'member.updated':
     default:
       return `${actor} wijzigde ${member}`;
   }
+}
+
+/** " — 5 x melee" bij een kasboekregel, of niets als de omschrijving ontbreekt. */
+function beschrijf(value: Record<string, unknown> | null): string {
+  const omschrijving = readString(value, 'description');
+  return omschrijving ? ` — ${omschrijving}` : '';
 }

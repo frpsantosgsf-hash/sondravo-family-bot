@@ -273,6 +273,10 @@ async function voerImportUit(
         rank: rang,
         discord_username: discordLid.username,
         avatar_url: discordLid.avatarUrl,
+        // Vandaag, want vandaag zien we hem voor het eerst. Zonder deze datum
+        // zou de gangpot hem vanaf de allereerste week laten meetellen en
+        // stond een nieuw lid meteen weken in het rood.
+        joined_at: new Date().toISOString().slice(0, 10),
       })
       .select('id')
       .maybeSingle();
