@@ -107,6 +107,15 @@ export interface PotMember {
   weeks: Record<string, PotWeekStatus>;
   openWeeks: number;
   openAmount: number;
+  /** Aantal weken dat wél betaald is, en wat dat samen was. */
+  paidWeeks: number;
+  paidAmount: number;
+}
+
+/** Wie een bijdrage afvinkte en wanneer. */
+export interface PotMark {
+  by: string | null;
+  at: string;
 }
 
 /** Een uitgave of een inkomst — dezelfde vorm, zodat de UI er één lijst van maakt. */
@@ -142,6 +151,13 @@ export interface PotData {
   currentFriday: string;
   weeks: PotWeek[];
   members: PotMember[];
+  /**
+   * Wie welke bijdrage afvinkte, gesleuteld op "lid|vrijdag".
+   *
+   * Los van de leden zelf: een lid heeft één regel per week, en die zou
+   * anders twee keer in de JSON staan.
+   */
+  marks: Record<string, PotMark>;
   expenses: PotEntry[];
   income: PotEntry[];
   totals: PotTotals;

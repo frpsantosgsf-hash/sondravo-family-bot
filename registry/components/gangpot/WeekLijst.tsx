@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Avatar } from '@/components/registry/Avatar';
 import { Spinner } from '@/components/ui/Button';
 import { rankAccent } from '@/lib/ranks';
-import { displayName } from '@/lib/format';
+import { displayName, relativeTime } from '@/lib/format';
 import { dagenTot, deadlineVan, geld, volledigeDatum } from '@/lib/weken';
 import type { PotData, Rank } from '@/types';
 
@@ -26,6 +27,12 @@ interface WeekLijstProps {
  * van vandaag. De geschiedenis staat op zijn eigen tabblad.
  */
 export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: WeekLijstProps) {
+  /*
+   * Bij het afvinken kijk je maar naar één ding: wie er nog niet betaald
+   * heeft. Met twintig namen scrol je anders steeds langs de zeventien die al
+   * groen staan. De knop springt vanzelf terug zodra de week rond is.
+   */
+  const [alleenOpen, setAlleenOpen] = useState(false);
   const rangen = new Map(ranks.map((rang) => [rang.key, rang] as const));
   const index = data.weeks.findIndex((week) => week.friday === vrijdag);
   const week = data.weeks[index];
@@ -50,6 +57,11 @@ export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: 
   const deadline = deadlineVan(week.friday);
   const dagen = dagenTot(deadline);
   const loopt = vrijdag === data.currentFriday;
+  const nogOpen = week.due - week.paid;
+
+  const zichtbaar = alleenOpen
+    ? data.members.filter((lid) => lid.weeks[vrijdag] === 'open')
+    : data.members;
 
   return (
     <div className="space-y-4">
@@ -66,8 +78,13 @@ export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: 
         </button>
 
         <div className="min-w-0 text-center">
-          <p className="font-display text-base uppercase tracking-[0.12em] text-creme">
+          <p className="flex items-center justify-center gap-2 font-display text-base uppercase tracking-[0.12em] text-creme">
             Week {week.weekNumber}
+            {loopt ? (
+              <span className="rounded-full border border-sondravo-green/45 bg-sondravo-green/15 px-1.5 py-0.5 text-[9px] tracking-[0.16em] text-[#7ddba3]">
+                NU
+              </span>
+            ) : null}
           </p>
           <p className="truncate text-[11px] text-muted">vrijdag {volledigeDatum(week.friday)}</p>
         </div>
@@ -116,90 +133,155 @@ export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: 
                 }.`
             : `Deze week liep af op vrijdag ${volledigeDatum(deadline)}.`}
         </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Filter: alleen zichtbaar als er iets te filteren valt. */}
+          {nogOpen > 0 ? (
+            <div className="flex gap-1 rounded-lg border border-line bg-void/40 p-1">
+              <Schakel actief={!alleenOpen} onClick={() => setAlleenOpen(false)}>
+                Alle {week.due}
+              </Schakel>
+              <Schakel actief={alleenOpen} onClick={() => setAlleenOpen(true)}>
+                Alleen open {nogOpen}
+              </Schakel>
+            </div>
+          ) : null}
+
+          {/* Terugspringen naar nu, zodat je niet hoeft te tellen hoe ver je
+              teruggebladerd bent. */}
+          {!loopt ? (
+            <button
+              type="button"
+              onClick={() => onVrijdag(data.currentFriday)}
+              className="tap-target inline-flex items-center rounded-lg border border-line bg-panel-high px-3 text-[12px] text-muted transition-colors hover:border-creme/25 hover:text-ink"
+            >
+              Terug naar deze week
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* --- de leden -------------------------------------------------------- */}
-      <ul className="panel divide-y divide-line/60 overflow-hidden border border-line">
-        {data.members.map((lid) => {
-          const rang = rangen.get(lid.rank);
-          const accent = rankAccent(rang?.color ?? '');
-          const stand = lid.weeks[vrijdag] ?? 'nvt';
-          const betaald = stand === 'betaald';
-          const telMee = stand !== 'nvt';
-          const ikZelf = lid.id === data.meId;
+      {zichtbaar.length === 0 ? (
+        <p className="panel border border-sondravo-green/25 bg-sondravo-green/[0.05] px-5 py-8 text-center text-sm text-[#a8f0c6]">
+          Iedereen heeft deze week betaald.
+        </p>
+      ) : (
+        <ul className="panel divide-y divide-line/60 overflow-hidden border border-line">
+          {zichtbaar.map((lid) => {
+            const rang = rangen.get(lid.rank);
+            const accent = rankAccent(rang?.color ?? '');
+            const stand = lid.weeks[vrijdag] ?? 'nvt';
+            const betaald = stand === 'betaald';
+            const telMee = stand !== 'nvt';
+            const mark = data.marks[`${lid.id}|${vrijdag}`];
+            const ikZelf = lid.id === data.meId;
 
-          return (
-            <li
-              key={lid.id}
-              className={`flex items-center gap-3 px-3 py-3 sm:px-4 ${
-                ikZelf ? 'bg-creme/[0.04]' : ''
-              }`}
-            >
-              <Avatar name={lid.name} src={lid.avatarUrl} ring={accent.ring} size="sm" />
+            return (
+              <li
+                key={lid.id}
+                className={`flex items-center gap-3 px-3 py-3 sm:px-4 ${
+                  ikZelf ? 'bg-creme/[0.04]' : ''
+                }`}
+              >
+                <Avatar name={lid.name} src={lid.avatarUrl} ring={accent.ring} size="sm" />
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink">
-                  {displayName(lid.name)}
-                  {ikZelf ? (
-                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
-                      jij
-                    </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">
+                    {displayName(lid.name)}
+                    {ikZelf ? (
+                      <span className="ml-1.5 text-[10px] uppercase tracking-[0.16em] text-muted">
+                        jij
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-muted">
+                    {rang?.label ?? lid.rank}
+                    {lid.openWeeks > 0 ? (
+                      <span className="text-[#f2a9ac]">
+                        {' · '}
+                        {lid.openWeeks} {lid.openWeeks === 1 ? 'week' : 'weken'} open
+                      </span>
+                    ) : (
+                      <span className="text-[#7ddba3]"> · helemaal bij</span>
+                    )}
+                  </p>
+
+                  {/* Wie het afvinkte en wanneer. Bij geld hoort te zien te zijn
+                    waar een regel vandaan komt, zonder het logboek te openen. */}
+                  {betaald && mark ? (
+                    <p className="mt-0.5 truncate text-[10px] text-muted-soft">
+                      {mark.by ? `${mark.by} · ` : ''}
+                      {relativeTime(mark.at)}
+                    </p>
                   ) : null}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] text-muted">
-                  {rang?.label ?? lid.rank}
-                  {lid.openWeeks > 0 ? (
-                    <span className="text-[#f2a9ac]">
-                      {' · '}
-                      {lid.openWeeks} {lid.openWeeks === 1 ? 'week' : 'weken'} open
-                    </span>
-                  ) : (
-                    <span className="text-[#7ddba3]"> · helemaal bij</span>
-                  )}
-                </p>
-              </div>
+                </div>
 
-              {!telMee ? (
-                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-soft">
-                  Nog geen lid
-                </span>
-              ) : data.isAdmin ? (
-                <button
-                  type="button"
-                  onClick={() => onToggle(lid.id, !betaald)}
-                  disabled={bezig !== null}
-                  aria-pressed={betaald}
-                  className={`tap-target flex shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium uppercase tracking-[0.12em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-55 ${
-                    betaald
-                      ? 'border-sondravo-green/50 bg-sondravo-green/15 text-[#7ddba3] hover:border-sondravo-green/80'
-                      : 'border-line bg-panel-high text-muted hover:border-creme/25 hover:text-ink'
-                  }`}
-                >
-                  {bezig === lid.id ? (
-                    <Spinner className="h-3.5 w-3.5" />
-                  ) : betaald ? (
-                    <Vinkje />
-                  ) : (
-                    <Kruisje />
-                  )}
-                  {betaald ? 'Betaald' : 'Open'}
-                </button>
-              ) : (
-                <span
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-[12px] font-medium uppercase tracking-[0.12em] ${
-                    betaald
-                      ? 'border-sondravo-green/50 bg-sondravo-green/15 text-[#7ddba3]'
-                      : 'border-sondravo-red/35 bg-sondravo-red/10 text-[#f2a9ac]'
-                  }`}
-                >
-                  {betaald ? 'Betaald' : 'Open'}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                {!telMee ? (
+                  <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-soft">
+                    Nog geen lid
+                  </span>
+                ) : data.isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggle(lid.id, !betaald)}
+                    disabled={bezig !== null}
+                    aria-pressed={betaald}
+                    className={`tap-target flex shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium uppercase tracking-[0.12em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-55 ${
+                      betaald
+                        ? 'border-sondravo-green/50 bg-sondravo-green/15 text-[#7ddba3] hover:border-sondravo-green/80'
+                        : 'border-line bg-panel-high text-muted hover:border-creme/25 hover:text-ink'
+                    }`}
+                  >
+                    {bezig === lid.id ? (
+                      <Spinner className="h-3.5 w-3.5" />
+                    ) : betaald ? (
+                      <Vinkje />
+                    ) : (
+                      <Kruisje />
+                    )}
+                    {betaald ? 'Betaald' : 'Open'}
+                  </button>
+                ) : (
+                  <span
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-[12px] font-medium uppercase tracking-[0.12em] ${
+                      betaald
+                        ? 'border-sondravo-green/50 bg-sondravo-green/15 text-[#7ddba3]'
+                        : 'border-sondravo-red/35 bg-sondravo-red/10 text-[#f2a9ac]'
+                    }`}
+                  >
+                    {betaald ? 'Betaald' : 'Open'}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
+  );
+}
+
+function Schakel({
+  actief,
+  onClick,
+  children,
+}: {
+  actief: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={actief}
+      className={`rounded-md px-2.5 py-1.5 text-[12px] transition-colors ${
+        actief ? 'bg-creme/10 text-creme' : 'text-muted hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

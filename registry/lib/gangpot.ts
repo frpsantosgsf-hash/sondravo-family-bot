@@ -11,7 +11,15 @@ import {
   vrijdagenTot,
   weeknummer,
 } from '@/lib/weken';
-import type { PotData, PotEntry, PotMember, PotTotals, PotWeek, PotWeekStatus } from '@/types';
+import type {
+  PotData,
+  PotEntry,
+  PotMark,
+  PotMember,
+  PotTotals,
+  PotWeek,
+  PotWeekStatus,
+} from '@/types';
 import type { PotExpenseRow, PotIncomeRow } from '@/types/database';
 
 const STANDAARD_BIJDRAGE = 50_000;
@@ -24,6 +32,7 @@ const LEEG: PotData = {
   currentFriday: STANDAARD_EERSTE_VRIJDAG,
   weeks: [],
   members: [],
+  marks: {},
   expenses: [],
   income: [],
   totals: {
@@ -82,7 +91,9 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
       .from('members')
       .select('id, name, rank, avatar_url, joined_at')
       .order('name', { ascending: true }),
-    supabase.from('pot_contributions').select('member_id, week_friday, amount'),
+    supabase
+      .from('pot_contributions')
+      .select('member_id, week_friday, amount, marked_by, marked_at'),
     supabase.from('pot_expenses').select('*').order('spent_on', { ascending: false }),
     supabase.from('pot_income').select('*').order('received_on', { ascending: false }),
   ]);
@@ -121,11 +132,16 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
 
   // Betaald of niet is een ja/nee-vraag, dus een set is genoeg.
   const betaald = new Set<string>();
+  const marks: Record<string, PotMark> = {};
   let contributions = 0;
 
   for (const rij of bijdragenResultaat.data ?? []) {
     contributions += Number(rij.amount);
-    if (rij.member_id) betaald.add(`${rij.member_id}|${rij.week_friday}`);
+    if (!rij.member_id) continue;
+
+    const sleutel = `${rij.member_id}|${rij.week_friday}`;
+    betaald.add(sleutel);
+    marks[sleutel] = { by: rij.marked_by, at: rij.marked_at };
   }
 
   const leden: PotMember[] = (ledenResultaat.data ?? []).map((lid) => {
@@ -143,6 +159,7 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
 
     const weeks: Record<string, PotWeekStatus> = {};
     let openWeeks = 0;
+    let paidWeeks = 0;
 
     for (const vrijdag of weekDatums) {
       if (vrijdag < sinds) {
@@ -151,6 +168,7 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
       }
       if (betaald.has(`${lid.id}|${vrijdag}`)) {
         weeks[vrijdag] = 'betaald';
+        paidWeeks += 1;
         continue;
       }
       weeks[vrijdag] = 'open';
@@ -166,6 +184,8 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
       weeks,
       openWeeks,
       openAmount: openWeeks * weeklyAmount,
+      paidWeeks,
+      paidAmount: paidWeeks * weeklyAmount,
     };
   });
 
@@ -212,6 +232,7 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
     currentFriday,
     weeks,
     members: leden,
+    marks,
     expenses,
     income,
     totals,

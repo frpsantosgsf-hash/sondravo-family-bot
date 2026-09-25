@@ -69,6 +69,17 @@ export function Geschiedenis({ data, ranks }: { data: PotData; ranks: Rank[] }) 
                       </span>
                     )}
                   </p>
+
+                  {/* Wat iemand hééft ingelegd hoort er net zo goed te staan als
+                      wat hij open heeft. Een lijst die alleen schulden toont doet
+                      trouwe betalers tekort. Eigen regel, want naast de
+                      achterstand wordt het op een telefoon te vol. */}
+                  {lid.paidWeeks > 0 ? (
+                    <p className="mt-0.5 text-[11px] text-muted-soft">
+                      {lid.paidWeeks} {lid.paidWeeks === 1 ? 'week' : 'weken'} betaald ·{' '}
+                      {geld(lid.paidAmount)} ingelegd
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
