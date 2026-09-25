@@ -77,6 +77,18 @@ export function getApplicationWebhookUrl(): string | null {
 }
 
 /**
+ * Het kanaal waar het wekelijkse gangpot-bericht in komt.
+ *
+ * Alleen het kanaal-ID; de bot post er zelf in met het token dat de
+ * rollen-sync toch al gebruikt. Dat scheelt het aanmaken van een webhook, en
+ * het bericht komt van de bot in plaats van van een naamloze haak.
+ */
+export function getGangpotChannelId(): string | null {
+  const id = String(process.env.DISCORD_GANGPOT_CHANNEL_ID ?? '').trim();
+  return /^[0-9]{5,32}$/.test(id) ? id : null;
+}
+
+/**
  * Discord-webhook voor de wekelijkse gangpot-melding. Een eigen webhook en
  * niet die van de sollicitaties: de kas hoort in het kanaal van de familie,
  * niet bij de aanmeldingen. Leeg = geen melding in Discord.

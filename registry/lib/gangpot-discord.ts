@@ -1,7 +1,13 @@
 import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getGangpotWebhookUrl, hasServiceRoleKey, isSupabaseConfigured } from '@/lib/env';
+import {
+  getDiscordSyncConfig,
+  getGangpotChannelId,
+  getGangpotWebhookUrl,
+  hasServiceRoleKey,
+  isSupabaseConfigured,
+} from '@/lib/env';
 import {
   deadlineVan,
   geld,
@@ -143,6 +149,94 @@ function bouwEmbed(stand: Weekstand): Record<string, unknown> {
   };
 }
 
+const DISCORD_API = 'https://discord.com/api/v10';
+
+/**
+ * Waar het bericht naartoe gaat.
+ *
+ * Twee wegen, want ze hebben allebei hun plek. Een kanaal-ID is het minste
+ * werk — de bot heeft zijn token toch al voor de rollen-sync — en het bericht
+ * komt dan van de bot zelf. Een webhook blijft mogelijk voor wie de bot niet
+ * in dat kanaal wil hebben.
+ */
+interface Kanaal {
+  plaats(embed: Record<string, unknown>): Promise<string | null>;
+  bewerk(messageId: string, embed: Record<string, unknown>): Promise<'ok' | 'weg' | 'mislukt'>;
+}
+
+function botKanaal(channelId: string, botToken: string): Kanaal {
+  const headers = {
+    authorization: `Bot ${botToken}`,
+    'content-type': 'application/json',
+  };
+  const lichaam = (embed: Record<string, unknown>) =>
+    JSON.stringify({ embeds: [embed], allowed_mentions: { parse: [] } });
+
+  return {
+    async plaats(embed) {
+      const response = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+        method: 'POST',
+        headers,
+        body: lichaam(embed),
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { id?: string };
+      return typeof payload.id === 'string' ? payload.id : null;
+    },
+    async bewerk(messageId, embed) {
+      const response = await fetch(
+        `${DISCORD_API}/channels/${channelId}/messages/${messageId}`,
+        { method: 'PATCH', headers, body: lichaam(embed) },
+      );
+      if (response.ok) return 'ok';
+      return response.status === 404 ? 'weg' : 'mislukt';
+    },
+  };
+}
+
+function webhookKanaal(webhookUrl: string): Kanaal {
+  const headers = { 'content-type': 'application/json' };
+
+  return {
+    async plaats(embed) {
+      // ?wait=true, anders geeft Discord alleen een lege bevestiging terug en
+      // weten we het bericht-ID niet om het later bij te werken.
+      const response = await fetch(`${webhookUrl}?wait=true`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          username: 'Sondravo Gangpot',
+          embeds: [embed],
+          allowed_mentions: { parse: [] },
+        }),
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { id?: string };
+      return typeof payload.id === 'string' ? payload.id : null;
+    },
+    async bewerk(messageId, embed) {
+      const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ embeds: [embed], allowed_mentions: { parse: [] } }),
+      });
+      if (response.ok) return 'ok';
+      return response.status === 404 ? 'weg' : 'mislukt';
+    },
+  };
+}
+
+function kiesKanaal(): Kanaal | null {
+  const channelId = getGangpotChannelId();
+  const sync = getDiscordSyncConfig();
+  if (channelId && sync) return botKanaal(channelId, sync.botToken);
+
+  const webhookUrl = getGangpotWebhookUrl();
+  if (webhookUrl) return webhookKanaal(webhookUrl);
+
+  return null;
+}
+
 /**
  * Plaatst of bewerkt het bericht van één week.
  *
@@ -154,10 +248,10 @@ export async function syncGangpotBericht(
   vrijdag: string,
   maakAan = false,
 ): Promise<'geplaatst' | 'bijgewerkt' | 'overgeslagen'> {
-  const webhookUrl = getGangpotWebhookUrl();
-  // Zonder webhook of zonder service role-sleutel is er niets te doen, en dat
+  const kanaal = kiesKanaal();
+  // Zonder kanaal of zonder service role-sleutel is er niets te doen, en dat
   // is geen fout: de gangpot werkt op de site prima zonder Discord.
-  if (!webhookUrl || !hasServiceRoleKey) return 'overgeslagen';
+  if (!kanaal || !hasServiceRoleKey) return 'overgeslagen';
 
   const stand = await haalWeekstand(vrijdag);
   if (!stand) return 'overgeslagen';
@@ -172,60 +266,45 @@ export async function syncGangpotBericht(
     .maybeSingle();
 
   if (bestaand?.message_id) {
+    let uitkomst: 'ok' | 'weg' | 'mislukt';
     try {
-      const response = await fetch(`${webhookUrl}/messages/${bestaand.message_id}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed], allowed_mentions: { parse: [] } }),
-      });
-
-      if (response.ok) {
-        await supabase
-          .from('pot_week_messages')
-          .update({ message_id: bestaand.message_id, updated_at: new Date().toISOString() })
-          .eq('week_friday', vrijdag);
-        return 'bijgewerkt';
-      }
-
-      /*
-       * Het bericht is handmatig weggehaald. De verwijzing opruimen, zodat de
-       * volgende ronde een nieuw bericht mag plaatsen in plaats van eeuwig
-       * tegen een 404 aan te blijven lopen.
-       */
-      if (response.status === 404) {
-        await supabase.from('pot_week_messages').delete().eq('week_friday', vrijdag);
-      } else {
-        return 'overgeslagen';
-      }
+      uitkomst = await kanaal.bewerk(bestaand.message_id, embed);
     } catch {
       return 'overgeslagen';
     }
+
+    if (uitkomst === 'ok') {
+      await supabase
+        .from('pot_week_messages')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('week_friday', vrijdag);
+      return 'bijgewerkt';
+    }
+
+    if (uitkomst === 'mislukt') return 'overgeslagen';
+
+    /*
+     * Het bericht is handmatig weggehaald. De verwijzing opruimen, zodat de
+     * volgende ronde een nieuw bericht mag plaatsen in plaats van eeuwig
+     * tegen een 404 aan te blijven lopen.
+     */
+    await supabase.from('pot_week_messages').delete().eq('week_friday', vrijdag);
   }
 
   if (!maakAan) return 'overgeslagen';
 
+  let messageId: string | null;
   try {
-    const response = await fetch(`${webhookUrl}?wait=true`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        username: 'Sondravo Gangpot',
-        embeds: [embed],
-        allowed_mentions: { parse: [] },
-      }),
-    });
-
-    if (!response.ok) return 'overgeslagen';
-
-    const payload = (await response.json()) as { id?: string };
-    if (typeof payload.id !== 'string') return 'overgeslagen';
-
-    await supabase
-      .from('pot_week_messages')
-      .upsert({ week_friday: vrijdag, message_id: payload.id }, { onConflict: 'week_friday' });
-
-    return 'geplaatst';
+    messageId = await kanaal.plaats(embed);
   } catch {
     return 'overgeslagen';
   }
+
+  if (!messageId) return 'overgeslagen';
+
+  await supabase
+    .from('pot_week_messages')
+    .upsert({ week_friday: vrijdag, message_id: messageId }, { onConflict: 'week_friday' });
+
+  return 'geplaatst';
 }

@@ -72,7 +72,8 @@ De kas van de familie, waar eerst een spreadsheet voor rondging.
 - **Historie** — per lid een rij bolletjes, zwaarste achterstand bovenaan
 - Leden lezen mee, alleen de Lead vinkt af en boekt
 - Elke vrijdagochtend één bericht in Discord dat zichzelf bijwerkt zodra er
-  iemand wordt afgevinkt
+  iemand wordt afgevinkt. De bot post het zelf in het kanaal uit
+  `DISCORD_GANGPOT_CHANNEL_ID`; een webhook kan ook
 - Wie de familie verlaat verdwijnt uit de ledenlijst, maar zijn betalingen
   blijven met naam in de boeken staan
 
@@ -320,7 +321,8 @@ Alles staat met uitleg in `.env.example`. Kort samengevat:
 | `DISCORD_MEMBER_ROLE_ID` | — | **nee** | De familierol; bepaalt wie op de ledenlijst hoort |
 | `DISCORD_APPLICANT_ROLE_ID` | — | **nee** | Rol die toegang geeft tot het sollicitatieformulier |
 | `DISCORD_APPLICATION_WEBHOOK_URL` | — | **nee** | Webhook waar een nieuwe sollicitatie binnenkomt |
-| `DISCORD_GANGPOT_WEBHOOK_URL` | — | **nee** | Webhook voor het wekelijkse gangpot-bericht |
+| `DISCORD_GANGPOT_CHANNEL_ID` | — | **nee** | Kanaal waar het wekelijkse gangpot-bericht in komt |
+| `DISCORD_GANGPOT_WEBHOOK_URL` | — | **nee** | Alternatief voor het kanaal-ID, via een webhook |
 | `CRON_SECRET` | — | **nee** | Geheim voor de nachtelijke rol-sync én de vrijdagse gangpot-melding |
 | `BOT_API_SECRET` | — | **nee** | Gedeeld geheim tussen bot en website |
 | `NEXT_PUBLIC_SITE_URL` | — | ja | Correcte OAuth-redirects en deelkaarten |

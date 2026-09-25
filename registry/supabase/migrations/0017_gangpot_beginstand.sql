@@ -4,14 +4,20 @@
 -- Zet de gangpot op de stand van week 39 (25-09-2026), zodat de site verder
 -- telt waar het bestand ophield in plaats van bij nul te beginnen.
 --
--- Het beginsaldo is geen overgeschreven getal maar een afgeleide, en dat is
--- maar goed ook: het stond niet zichtbaar in het bestand.
+-- Het beginsaldo is NUL. Alles wat in de pot zit komt uit de wekelijkse
+-- bijdragen en uit het tabblad Inkomsten:
 --
---     actueel saldo   8.182.319
---   - ontvangen       2.500.000
---   + uitgegeven      2.600.000
+--     bijdragen        2.800.000   (56 betaalde weken x 50.000)
+--   + inkomsten        8.482.319   (het tabblad Inkomsten)
+--   - uitgaven         2.600.000
 --   ------------------------------
---     beginsaldo      8.282.319
+--     saldo            8.682.319   = ACTUEEL SALDO in het bestand
+--
+-- Een eerdere versie van dit bestand zette hier 8.282.319 als beginsaldo neer.
+-- Dat was een afgeleide uit een tijd dat het tabblad Inkomsten nog niet in
+-- beeld was: het saldo klopte toen toevallig, maar de herkomst niet. Nu staan
+-- de inkomsten waar ze horen, en is het beginsaldo weer wat het hoort te zijn.
+-- Draai dit bestand gerust opnieuw; het zet dat oude getal netjes terug op nul.
 --
 -- Namen worden gekoppeld op de ledenlijst, niet overgetypt. Staat een naam
 -- uit het bestand niet in het register, dan wordt die regel overgeslagen —
@@ -23,18 +29,19 @@
 -- ---------------------------------------------------------------------------
 -- 1. Instellingen
 --
---    Alleen wanneer het beginsaldo nog op nul staat. Heb je het later met de
---    hand bijgesteld, dan zet dit bestand dat niet stilletjes terug.
+--    Het beginsaldo wordt alleen aangeraakt wanneer het nul is of nog op de
+--    eerder foutief gezette 8.282.319 staat. Heb je het zelf op iets anders
+--    gezet, dan blijft dat staan.
 -- ---------------------------------------------------------------------------
 update public.pot_settings
-   set opening_balance = 8282319,
+   set opening_balance = 0,
        weekly_amount   = 50000,
        first_friday    = date '2026-09-04'
  where id = 1
-   and opening_balance = 0;
+   and opening_balance in (0, 8282319);
 
 -- ---------------------------------------------------------------------------
--- 2. De drie uitgaven van het tabblad Uitgaven
+-- 2. De uitgaven van het tabblad Uitgaven
 -- ---------------------------------------------------------------------------
 insert into public.pot_expenses (spent_on, description, paid_by, amount, created_by)
 select v.spent_on, v.description, v.paid_by, v.amount, 'Beginstand'
@@ -52,28 +59,56 @@ select v.spent_on, v.description, v.paid_by, v.amount, 'Beginstand'
  );
 
 -- ---------------------------------------------------------------------------
--- 3. De betaalde weken
+-- 3. De inkomsten van het tabblad Inkomsten
+--
+--    Geld dat buiten de wekelijkse bijdragen om in de pot kwam. Dit is
+--    verreweg het grootste deel van het saldo, dus zonder deze regels klopt
+--    er niets van de kas.
+-- ---------------------------------------------------------------------------
+insert into public.pot_income (received_on, description, source, amount, created_by)
+select v.received_on, v.description, v.source, v.amount, 'Beginstand'
+  from (values
+    (date '2026-09-12', 'Geript geld',    'groep (bij elkaar)', 3884010::bigint),
+    (date '2026-09-17', 'Geript geld',    'groep',               500000::bigint),
+    (date '2026-09-18', 'Geript geld',    'groep',              1798309::bigint),
+    (date '2026-09-20', 'Geript geld',    'groep',               300000::bigint),
+    (date '2026-09-23', 'Geript geld',    'groep',              1800000::bigint),
+    (date '2026-09-25', 'Levy mes kwijt', null,                  200000::bigint)
+  ) as v(received_on, description, source, amount)
+ where not exists (
+   select 1
+     from public.pot_income i
+    where i.received_on = v.received_on
+      and i.description = v.description
+      and i.amount = v.amount
+ );
+
+-- ---------------------------------------------------------------------------
+-- 4. De betaalde weken
 --
 --    Per lid de weeknummers die op Betaald stonden. Week 36 is vrijdag
 --    04-09-2026; elke volgende week is zeven dagen later.
+--
+--    Samen 56 betalingen: 17 in week 36, 15 in week 37, 16 in week 38 en 8 in
+--    week 39 — precies de regel "Aantal betaald" uit het bestand.
 -- ---------------------------------------------------------------------------
 with betaald(naam, weken) as (values
   ('rick',     array[36, 37, 38]),
-  ('vito',     array[36, 37, 38]),
+  ('vito',     array[36, 37, 38, 39]),
   ('ryan',     array[36, 37, 38, 39]),
-  ('renzo',    array[36, 37, 38]),
-  ('levy',     array[36, 37, 38]),
+  ('renzo',    array[36, 37, 38, 39]),
+  ('levy',     array[36, 37, 38, 39]),
   ('dave',     array[36, 38]),
   ('dishway',  array[37, 38]),
   ('gonzalo',  array[36, 37, 38]),
   ('culms',    array[36, 37, 38]),
   ('bseah',    array[36, 37, 38, 39]),
   ('baksteen', array[37, 38]),
-  ('thomas',   array[36, 37]),
+  ('thomas',   array[36, 37, 38]),
   ('rano',     array[36, 37, 38, 39]),
   ('rinnie',   array[36, 38]),
-  ('santos',   array[36, 37, 38]),
-  ('ferry',    array[36, 38]),
+  ('santos',   array[36, 37, 38, 39]),
+  ('ferry',    array[36, 38, 39]),
   ('jayden',   array[36]),
   ('zoef',     array[37]),
   ('xavier',   array[36, 37]),
@@ -92,7 +127,7 @@ select m.id,
 on conflict (member_id, week_friday) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 4. De proef op de som
+-- 5. De proef op de som
 --
 --    Eén regel met alles erin, en dat is geen opmaak: de SQL Editor van
 --    Supabase toont alleen het resultaat van de láátste query. Stonden deze
@@ -103,9 +138,9 @@ on conflict (member_id, week_friday) do nothing;
 --
 --      niet_gekoppeld        alles gekoppeld
 --      verwachte_betalingen  80
---      geregistreerd         50
---      nog_te_betalen        1.500.000
---      saldo                 8.182.319
+--      geregistreerd         56
+--      nog_te_betalen        1.200.000
+--      saldo                 8.682.319
 --
 --    Staat er een naam bij niet_gekoppeld, dan heet die persoon in het
 --    register anders dan in het oude bestand. Zijn betalingen zijn NIET

@@ -18,18 +18,24 @@ interface Cijfer {
 export function SaldoKaart({ data }: { data: PotData }) {
   const { totals, weeklyAmount, currentFriday, members } = data;
 
+  /*
+   * Dezelfde vier getallen als de tabbladen van het oude bestand, zodat je ze
+   * naast elkaar kunt leggen. Bijdragen en inkomsten staan apart en niet
+   * opgeteld: het zijn twee heel verschillende stromen, en samengevoegd zie je
+   * niet meer of de pot van de wekelijkse inleg leeft of van wat er binnenkomt.
+   */
   const cijfers: Cijfer[] = [
     {
-      label: 'Beginsaldo',
-      waarde: totals.opening,
-      toon: 'neutraal',
-      uitleg: 'Wat er al in de pot zat',
+      label: 'Bijdragen',
+      waarde: totals.contributions,
+      toon: 'groen',
+      uitleg: 'Wekelijkse inleg',
     },
     {
-      label: 'Ontvangen',
-      waarde: totals.contributions + totals.income,
+      label: 'Inkomsten',
+      waarde: totals.income,
       toon: 'groen',
-      uitleg: 'Bijdragen en overige inkomsten',
+      uitleg: 'Erbij buiten de inleg om',
     },
     {
       label: 'Uitgegeven',
@@ -66,6 +72,9 @@ export function SaldoKaart({ data }: { data: PotData }) {
         <p className="mt-3 text-[13px] leading-relaxed text-muted">
           {members.length} {members.length === 1 ? 'lid' : 'leden'} · {geld(weeklyAmount)} per
           vrijdag · huidige week {weeknummer(currentFriday)} ({korteDatum(currentFriday)})
+          {/* Het beginsaldo hoort alleen in beeld wanneer het er is. Een tegel
+              met een nul erin vraagt aandacht voor niets. */}
+          {totals.opening > 0 ? ` · beginsaldo ${geld(totals.opening)}` : ''}
         </p>
       </div>
 
