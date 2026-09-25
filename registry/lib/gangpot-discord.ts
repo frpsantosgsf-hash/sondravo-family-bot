@@ -2,7 +2,15 @@ import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getGangpotWebhookUrl, hasServiceRoleKey, isSupabaseConfigured } from '@/lib/env';
-import { geld, laatsteDatum, vrijdagVan, volledigeDatum, weeknummer } from '@/lib/weken';
+import {
+  deadlineVan,
+  geld,
+  laatsteDatum,
+  vrijdagNa,
+  vrijdagVoor,
+  volledigeDatum,
+  weeknummer,
+} from '@/lib/weken';
 
 /**
  * De wekelijkse gangpot-melding in Discord.
@@ -41,7 +49,7 @@ async function haalWeekstand(vrijdag: string): Promise<Weekstand | null> {
 
   const bijdrage = Number(instellingen.data?.weekly_amount ?? 50_000);
   const beginsaldo = Number(instellingen.data?.opening_balance ?? 0);
-  const eersteVrijdag = vrijdagVan(instellingen.data?.first_friday ?? vrijdag);
+  const eersteVrijdag = vrijdagVoor(instellingen.data?.first_friday ?? vrijdag);
 
   const betaaldDezeWeek = new Set(
     (weekRijen.data ?? []).map((rij) => rij.member_id).filter((id): id is string => Boolean(id)),
@@ -55,7 +63,7 @@ async function haalWeekstand(vrijdag: string): Promise<Weekstand | null> {
     // regel als op de site.
     const sinds =
       lid.joined_at && lid.joined_at.length >= 10
-        ? laatsteDatum(eersteVrijdag, vrijdagVan(lid.joined_at.slice(0, 10)))
+        ? laatsteDatum(eersteVrijdag, vrijdagNa(lid.joined_at.slice(0, 10)))
         : eersteVrijdag;
 
     if (vrijdag < sinds) continue;
@@ -104,7 +112,9 @@ function bouwEmbed(stand: Weekstand): Record<string, unknown> {
       `Vrijdag ${volledigeDatum(stand.vrijdag)} · **${geld(stand.bijdrage)}** per lid`,
       alles
         ? '**Iedereen heeft betaald.** Mooi werk.'
-        : `Nog **${stand.open.length}** van de **${totaal}** te gaan.`,
+        : `Nog **${stand.open.length}** van de **${totaal}** te gaan — betalen kan tot vrijdag ${volledigeDatum(
+            deadlineVan(stand.vrijdag),
+          )}.`,
     ].join('\n'),
     // Groen zodra de week rond is, anders oranje: dezelfde taal als de site.
     color: alles ? 0x2fa36b : 0xe0871f,

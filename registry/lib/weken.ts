@@ -53,14 +53,44 @@ function isoDagnummer(datum: string): number {
 }
 
 /**
- * De vrijdag van de week waarin deze datum valt.
+ * De laatste vrijdag op of vóór deze datum.
  *
- * Bewust de vrijdag van de héle week en niet "de eerstvolgende vrijdag": een
- * betaling die zaterdag binnenkomt hoort bij de week die net voorbij is, niet
- * bij de week die begint.
+ * Dit is de kern van de hele regeling: er wordt op vrijdag ingelegd en je hebt
+ * tot de volgende vrijdag de tijd. Een betaalweek loopt dus van vrijdag tot
+ * vrijdag, en wordt aangeduid met de vrijdag waarop hij begon.
+ *
+ * Bewust niet de vrijdag van de ISO-week (maandag t/m zondag). Die springt op
+ * maandag al naar de vrijdag die nog moet komen, en dan zou de site vier
+ * dagen per week een inleg opeisen waarvan de dag nog niet eens geweest is.
  */
-export function vrijdagVan(datum: string): string {
-  return telDagenOp(datum, 5 - isoDagnummer(datum));
+export function vrijdagVoor(datum: string): string {
+  return telDagenOp(datum, -((isoDagnummer(datum) - 5 + 7) % 7));
+}
+
+/**
+ * De eerste vrijdag op of na deze datum.
+ *
+ * Voor de dag dat iemand lid wordt: wie op maandag binnenkomt heeft de
+ * vrijdag daarvoor niet gemist, want toen was hij er nog niet. Zijn eerste
+ * inleg is die van de vrijdag die komt.
+ */
+export function vrijdagNa(datum: string): string {
+  return telDagenOp(datum, (5 - isoDagnummer(datum) + 7) % 7);
+}
+
+/**
+ * De uiterste dag van een betaalweek: de vrijdag erna.
+ *
+ * Op die dag begint de volgende week, dus wie dan nog niet betaald heeft
+ * loopt achter.
+ */
+export function deadlineVan(vrijdag: string): string {
+  return telDagenOp(vrijdag, 7);
+}
+
+/** Hele dagen van de ene datum naar de andere. Negatief als hij al voorbij is. */
+export function dagenTot(datum: string): number {
+  return Math.round((naarUtc(datum).getTime() - naarUtc(vandaag()).getTime()) / DAG_MS);
 }
 
 /**
@@ -73,9 +103,14 @@ export function laatsteDatum(a: string, b: string): string {
   return a > b ? a : b;
 }
 
-/** De vrijdag van de lopende week, in Amsterdamse tijd. */
+/**
+ * De vrijdag waarmee de lopende betaalweek begon, in Amsterdamse tijd.
+ *
+ * Op zaterdag is dat nog steeds gisteren: de week die vrijdag begon loopt
+ * gewoon door tot de volgende vrijdag.
+ */
 export function huidigeVrijdag(): string {
-  return vrijdagVan(vandaag());
+  return vrijdagVoor(vandaag());
 }
 
 /** Het ISO-weeknummer, hetzelfde nummer dat de spreadsheet gebruikt. */
@@ -94,7 +129,7 @@ export function weeknummer(datum: string): number {
  * en ze zouden alleen maar als achterstand meetellen.
  */
 export function vrijdagenTot(eersteVrijdag: string, laatsteVrijdag: string): string[] {
-  const start = vrijdagVan(eersteVrijdag);
+  const start = vrijdagVoor(eersteVrijdag);
   const reeks: string[] = [];
 
   for (let dag = start; dag <= laatsteVrijdag; dag = telDagenOp(dag, 7)) {

@@ -122,7 +122,10 @@ with s as (
   select * from public.pot_settings where id = 1
 ),
 huidige as (
-  select (current_date + (5 - extract(isodow from current_date)::int))::date as vrijdag
+  -- De laatste vrijdag die gewéést is. Er wordt op vrijdag ingelegd en je hebt
+  -- tot de volgende vrijdag de tijd, dus de week die nu loopt begon op de
+  -- vrijdag achter ons — niet op de vrijdag die nog moet komen.
+  select (current_date - ((extract(isodow from current_date)::int - 5 + 7) % 7))::date as vrijdag
 ),
 weken as (
   select reeks::date as vrijdag
@@ -138,7 +141,7 @@ verwacht as (
            s.first_friday,
            (
              coalesce(m.joined_at, s.first_friday)
-             + (5 - extract(isodow from coalesce(m.joined_at, s.first_friday))::int)
+             + ((5 - extract(isodow from coalesce(m.joined_at, s.first_friday))::int + 7) % 7)
            )::date
          )
 )

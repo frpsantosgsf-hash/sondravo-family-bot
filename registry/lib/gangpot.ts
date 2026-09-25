@@ -3,7 +3,14 @@ import 'server-only';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
-import { huidigeVrijdag, laatsteDatum, vrijdagVan, vrijdagenTot, weeknummer } from '@/lib/weken';
+import {
+  huidigeVrijdag,
+  laatsteDatum,
+  vrijdagNa,
+  vrijdagVoor,
+  vrijdagenTot,
+  weeknummer,
+} from '@/lib/weken';
 import type { PotData, PotEntry, PotMember, PotTotals, PotWeek, PotWeekStatus } from '@/types';
 import type { PotExpenseRow, PotIncomeRow } from '@/types/database';
 
@@ -107,7 +114,7 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
 
   const weeklyAmount = Number(instellingen.data?.weekly_amount ?? STANDAARD_BIJDRAGE);
   const openingBalance = Number(instellingen.data?.opening_balance ?? 0);
-  const firstFriday = vrijdagVan(instellingen.data?.first_friday ?? STANDAARD_EERSTE_VRIJDAG);
+  const firstFriday = vrijdagVoor(instellingen.data?.first_friday ?? STANDAARD_EERSTE_VRIJDAG);
   const currentFriday = huidigeVrijdag();
 
   const weekDatums = vrijdagenTot(firstFriday, currentFriday);
@@ -214,10 +221,15 @@ export const getGangpotData = cache(async (): Promise<PotData> => {
   };
 });
 
-/** De eerste betaalvrijdag van een lid, nooit vóór die van de pot zelf. */
+/**
+ * De eerste betaalvrijdag van een lid, nooit vóór die van de pot zelf.
+ *
+ * De eerstvolgende vrijdag en niet de laatste: wie op dinsdag binnenkomt heeft
+ * de vrijdag daarvoor niet gemist.
+ */
 function eersteWeekVan(datum: string | null, eersteVrijdag: string): string {
   if (!datum || datum.length < 10) return eersteVrijdag;
-  return laatsteDatum(eersteVrijdag, vrijdagVan(datum.slice(0, 10)));
+  return laatsteDatum(eersteVrijdag, vrijdagNa(datum.slice(0, 10)));
 }
 
 /** Weigert de database dit alleen omdat de bezoeker er niet bij mag? */

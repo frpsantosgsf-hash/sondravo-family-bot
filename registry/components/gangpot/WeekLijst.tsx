@@ -4,7 +4,7 @@ import { Avatar } from '@/components/registry/Avatar';
 import { Spinner } from '@/components/ui/Button';
 import { rankAccent } from '@/lib/ranks';
 import { displayName } from '@/lib/format';
-import { geld, volledigeDatum } from '@/lib/weken';
+import { dagenTot, deadlineVan, geld, volledigeDatum } from '@/lib/weken';
 import type { PotData, Rank } from '@/types';
 
 interface WeekLijstProps {
@@ -41,6 +41,15 @@ export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: 
   const vorige = data.weeks[index - 1];
   const volgende = data.weeks[index + 1];
   const percentage = week.due === 0 ? 0 : Math.round((week.paid / week.due) * 100);
+
+  /*
+   * Er wordt op vrijdag ingelegd en je hebt tot de volgende vrijdag de tijd.
+   * Die dag staat er daarom bij: zonder einddatum is "deze week" een begrip
+   * waar iedereen zijn eigen invulling aan geeft.
+   */
+  const deadline = deadlineVan(week.friday);
+  const dagen = dagenTot(deadline);
+  const loopt = vrijdag === data.currentFriday;
 
   return (
     <div className="space-y-4">
@@ -97,6 +106,16 @@ export function WeekLijst({ data, ranks, vrijdag, onVrijdag, onToggle, bezig }: 
             style={{ width: `${percentage}%` }}
           />
         </div>
+
+        <p className="mt-3 text-[11px] leading-relaxed text-muted-soft">
+          {loopt
+            ? week.paid >= week.due
+              ? `Iedereen is bij. Volgende inleg op vrijdag ${volledigeDatum(deadline)}.`
+              : `Betalen kan tot vrijdag ${volledigeDatum(deadline)}${
+                  dagen > 0 ? ` — nog ${dagen} ${dagen === 1 ? 'dag' : 'dagen'}` : ''
+                }.`
+            : `Deze week liep af op vrijdag ${volledigeDatum(deadline)}.`}
+        </p>
       </div>
 
       {/* --- de leden -------------------------------------------------------- */}

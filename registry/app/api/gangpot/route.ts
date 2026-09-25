@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getViewerAccess, mayViewRegistry } from '@/lib/access';
 import { getGangpotData } from '@/lib/gangpot';
 import { syncGangpotBericht } from '@/lib/gangpot-discord';
-import { huidigeVrijdag, isDatum, vrijdagVan } from '@/lib/weken';
+import { huidigeVrijdag, isDatum, vrijdagVoor } from '@/lib/weken';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,12 +102,14 @@ export async function PATCH(request: NextRequest) {
 
   if (input.action === 'contribution') {
     /*
-     * De datum wordt naar de vrijdag van die week getrokken in plaats van
-     * geweigerd. Zo maakt het niet uit of het scherm de vrijdag of de dag
-     * zelf meestuurt, en komt een late betaling altijd in de week waar hij
-     * hoort — precies wat de oude spreadsheet met de hand voorschreef.
+     * De datum wordt naar de vrijdag getrokken waarmee die betaalweek begon,
+     * in plaats van geweigerd. Zo maakt het niet uit of het scherm de vrijdag
+     * of de dag zelf meestuurt, en komt een late betaling altijd in de week
+     * waar hij hoort — precies wat de oude spreadsheet met de hand
+     * voorschreef ("verwerk een late betaling in de kolom van de
+     * oorspronkelijke week").
      */
-    const vrijdag = vrijdagVan(input.friday);
+    const vrijdag = vrijdagVoor(input.friday);
 
     if (vrijdag > huidigeVrijdag()) {
       return NextResponse.json({ error: 'Die week is nog niet geweest.' }, { status: 400 });
