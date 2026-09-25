@@ -92,31 +92,24 @@ select m.id,
 on conflict (member_id, week_friday) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 4. Controle
+-- 4. De proef op de som
 --
---    Levert dit rijen op, dan staan die namen anders in het register dan in
---    de spreadsheet en zijn hun betalingen NIET overgezet. Hernoem het lid of
---    vink die weken met de hand af op /gangpot.
--- ---------------------------------------------------------------------------
-select b.naam as niet_gevonden_in_ledenlijst
-  from (values
-    ('rick'), ('vito'), ('ryan'), ('renzo'), ('levy'), ('dave'), ('dishway'),
-    ('gonzalo'), ('culms'), ('bseah'), ('baksteen'), ('thomas'), ('rano'),
-    ('rinnie'), ('santos'), ('ferry'), ('jayden'), ('zoef'), ('xavier'), ('tarik')
-  ) as b(naam)
- where not exists (
-   select 1
-     from public.members m
-    where lower(btrim(regexp_replace(m.name, '^\s*sdf\s*\|\s*', '', 'i'))) = b.naam
- );
-
--- ---------------------------------------------------------------------------
--- 5. De proef op de som
+--    Eén regel met alles erin, en dat is geen opmaak: de SQL Editor van
+--    Supabase toont alleen het resultaat van de láátste query. Stonden deze
+--    controles los van elkaar, dan zou juist de belangrijkste — welke namen
+--    niet gekoppeld konden worden — onzichtbaar blijven.
 --
---    Rekent "nog te betalen" precies zo uit als de site doet. Klopt dit getal
---    met het bedrag uit je oude bestand, dan staat alles goed. Wijkt het af,
---    dan is er een naam niet gekoppeld (zie de query hierboven) of telt er een
---    lid mee vanaf een andere week dan je verwacht.
+--    Verwacht bij een goede overzetting:
+--
+--      niet_gekoppeld        alles gekoppeld
+--      verwachte_betalingen  80
+--      geregistreerd         50
+--      nog_te_betalen        1.500.000
+--      saldo                 8.182.319
+--
+--    Staat er een naam bij niet_gekoppeld, dan heet die persoon in het
+--    register anders dan in het oude bestand. Zijn betalingen zijn NIET
+--    overgezet; vink die met de hand af op /gangpot.
 -- ---------------------------------------------------------------------------
 with s as (
   select * from public.pot_settings where id = 1
@@ -144,13 +137,28 @@ verwacht as (
              + ((5 - extract(isodow from coalesce(m.joined_at, s.first_friday))::int + 7) % 7)
            )::date
          )
+),
+uit_bestand(naam) as (values
+  ('rick'), ('vito'), ('ryan'), ('renzo'), ('levy'), ('dave'), ('dishway'),
+  ('gonzalo'), ('culms'), ('bseah'), ('baksteen'), ('thomas'), ('rano'),
+  ('rinnie'), ('santos'), ('ferry'), ('jayden'), ('zoef'), ('xavier'), ('tarik')
+),
+zoek as (
+  select string_agg(b.naam, ', ' order by b.naam) as namen
+    from uit_bestand b
+   where not exists (
+     select 1
+       from public.members m
+      where lower(btrim(regexp_replace(m.name, '^\s*sdf\s*\|\s*', '', 'i'))) = b.naam
+   )
 )
-select (select count(*) from verwacht)                                        as verwachte_betalingen,
+select coalesce((select namen from zoek), 'alles gekoppeld')                       as niet_gekoppeld,
+       (select count(*) from verwacht)                                            as verwachte_betalingen,
        (select count(*) from public.pot_contributions where member_id is not null) as geregistreerd,
        ((select count(*) from verwacht)
          - (select count(*) from public.pot_contributions where member_id is not null))
-         * (select weekly_amount from s)                                      as nog_te_betalen,
+         * (select weekly_amount from s)                                          as nog_te_betalen,
        (select opening_balance from s)
          + coalesce((select sum(amount) from public.pot_contributions), 0)
          + coalesce((select sum(amount) from public.pot_income), 0)
-         - coalesce((select sum(amount) from public.pot_expenses), 0)         as saldo;
+         - coalesce((select sum(amount) from public.pot_expenses), 0)             as saldo;
